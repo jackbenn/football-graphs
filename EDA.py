@@ -51,21 +51,22 @@ def _(pd):
 
 @app.cell
 def _():
-    # Download one season of nflverse play-by-play into data/.
+    # Download one season of nflverse play-by-play, and the table of teams, into data/.
     # Every name here starts with _, so no other cell depends on this one, and it
-    # only runs when run by hand. Delete the file to fetch a fresh copy.
+    # only runs when run by hand. Delete a file to fetch a fresh copy.
     import urllib.request as _request
     from pathlib import Path as _Path
 
     _year = 2018
-    _path = _Path(f'data/play_by_play_{_year}.csv.gz')
-    if _path.exists():
-        print(f'{_path} already exists')
-    else:
-        _request.urlretrieve(
-            f'https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_{_year}.csv.gz',
-            _path)
-        print(f'downloaded {_path}')
+    _base = 'https://github.com/nflverse/nflverse-data/releases/download'
+    for _url in [f'{_base}/pbp/play_by_play_{_year}.csv.gz',
+                 f'{_base}/teams/teams_colors_logos.csv']:
+        _path = _Path('data') / _url.rsplit('/', 1)[1]
+        if _path.exists():
+            print(f'{_path} already exists')
+        else:
+            _request.urlretrieve(_url, _path)
+            print(f'downloaded {_path}')
     return
 
 
@@ -76,6 +77,12 @@ def _(pd):
         yearly_df.append(pd.read_csv(f'data/play_by_play_{year}.csv.gz', low_memory=False))
     full_df = pd.concat(yearly_df, axis=0)
     return (full_df,)
+
+
+@app.cell
+def _(pd):
+    teams = pd.read_csv('data/teams_colors_logos.csv').set_index('team_abbr')
+    return (teams,)
 
 
 @app.cell
@@ -164,13 +171,80 @@ def _():
         """Add column for number of seconds into game"""
         df['Time'] = (df.qtr-1)*60*15 + 60*15 - df.quarter_seconds_remaining
 
-    # this hardcoding is really bad
-    def add_yards_column(df, team1 = 'IND'):
-        """Add column Position: yards from the end zone team1 attacks, so team1
-        always drives toward 0 and the other team toward 100"""
-        df['Position'] = df.yardline_100.where(df.defteam != team1, 100 - df.yardline_100)
+    def add_yards_column(df):
+        """Add column Position: yards from the end zone the home team defends, so
+        the home team always drives from 0 (the bottom of the plot) toward 100 and
+        the away team the other way"""
+        df['Position'] = df.yardline_100.where(df.defteam == df.home_team, 100 - df.yardline_100)
 
     return add_time_column, add_yards_column
+
+
+@app.cell
+def _(np):
+    def pick_colors(teams, home, away):
+        """Choose a line color for each team from its own colors, darkened where
+        needed to show on white, and distinct from each other for normal and
+        red-green colorblind vision. The away team gives way first."""
+        machado = {    # Machado et al. 2009, severity 1.0
+            'protan': np.array([[0.152286, 1.052583, -0.204868],
+                                [0.114503, 0.786281, 0.099216],
+                                [-0.003882, -0.048116, 1.051998]]),
+            'deutan': np.array([[0.367322, 0.860646, -0.227968],
+                                [0.280085, 0.672501, 0.047413],
+                                [-0.011820, 0.042940, 0.968881]]),
+        }
+
+        def linear(color):
+            rgb = np.array([int(color[i:i+2], 16) for i in (1, 3, 5)]) / 255
+            return np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
+
+        def oklab(lin):
+            lms = np.cbrt(np.array([[0.4122214708, 0.5363325363, 0.0514459929],
+                                    [0.2119034982, 0.6806995451, 0.1073969566],
+                                    [0.0883024619, 0.2817188376, 0.6299787005]]) @ lin)
+            return np.array([[0.2104542553, 0.7936177850, -0.0040720468],
+                             [1.9779984951, -2.4285922050, 0.4505937099],
+                             [0.0259040371, 0.7827717662, -0.8086757660]]) @ lms
+
+        def difference(c1, c2, cvd=None):
+            """OKLab distance x100, optionally as seen with a color vision deficiency"""
+            l1, l2 = linear(c1), linear(c2)
+            if cvd:
+                l1, l2 = np.clip(machado[cvd] @ l1, 0, 1), np.clip(machado[cvd] @ l2, 0, 1)
+            return 100 * np.linalg.norm(oklab(l1) - oklab(l2))
+
+        def contrast(color):
+            """WCAG contrast ratio against white"""
+            return 1.05 / (linear(color) @ [0.2126, 0.7152, 0.0722] + 0.05)
+
+        def usable(team):
+            colors = []
+            for color in teams.loc[team, ['team_color', 'team_color2', 'team_color3', 'team_color4']].dropna():
+                if difference(color, '#ffffff') < 10:    # white, or nearly
+                    continue
+                rgb = np.array([int(color[i:i+2], 16) for i in (1, 3, 5)])
+                while contrast(color) < 3:               # too pale for thin lines on white
+                    rgb = (rgb * 0.97).astype(int)
+                    color = '#%02x%02x%02x' % tuple(rgb)
+                if color not in colors:
+                    colors.append(color)
+            return colors
+
+        def distinct(c1, c2):
+            return (difference(c1, c2) >= 15 and
+                    min(difference(c1, c2, 'protan'), difference(c1, c2, 'deutan')) >= 8)
+
+        home_colors, away_colors = usable(home), usable(away)
+        # fewest steps from the two primaries first; on a tie the away team gives way
+        pairs = sorted(((h, a) for h in range(len(home_colors)) for a in range(len(away_colors))),
+                       key=lambda p: (sum(p), p[0]))
+        for h, a in pairs:
+            if distinct(home_colors[h], away_colors[a]):
+                return home_colors[h], away_colors[a]
+        return home_colors[0], 'grey'    # no pair works; no current matchup gets here
+
+    return (pick_colors,)
 
 
 @app.cell
@@ -214,8 +288,10 @@ def _(df):
 
 
 @app.cell
-def _(last_color, np, pd):
-    def plot_game(ax, df):
+def _(last_color, np, pd, pick_colors):
+    def plot_game(ax, df, teams):
+        home, away = df.home_team.iloc[0], df.away_team.iloc[0]
+        home_color, away_color = pick_colors(teams, home, away)
         last_pos = None
         last_time = None
         last_type = None
@@ -228,14 +304,12 @@ def _(last_color, np, pd):
                 offense, defense = row.defteam, row.posteam
             else:
                 offense, defense = row.posteam, row.defteam
-            #TODO fix this
-            index = 0 if defense == 'IND' else 1
-            endzone = 100 if defense == 'IND' else 0
-            # to do: add Color to df
-            color = 'r' if offense == 'IND' else 'b'
+            index = 0 if defense == home else 1
+            endzone = 0 if defense == home else 100
+            color = home_color if offense == home else away_color
 
             if row.play_type == 'kickoff':
-                ax.scatter([row.Time], [row.Position], marker="*", s=300, color=color)
+                ax.scatter([row.Time], [row.Position], marker="*", s=200, color=color)
                 if last_type is not None:
                     ax.plot([last_time, row.Time], [last_pos, endzone], color=last_color, lw=0.5)
             else:
@@ -249,13 +323,16 @@ def _(last_color, np, pd):
             if row.touchdown == 1:
                 # need ot handle extra point(s)
                 # td_team, since the defense can score too (e.g. a fumble return)
-                td_index = 1 if row.td_team == 'IND' else 0
-                td_endzone = 0 if row.td_team == 'IND' else 100
+                td_index = 1 if row.td_team == home else 0
+                td_endzone = 100 if row.td_team == home else 0
+                td_color = home_color if row.td_team == home else away_color
                 scores[td_index] += 7
-                ax.text(row.Time, 1.1*(td_endzone-50)+50, scores[td_index], fontweight='bold')
+                ax.text(row.Time, 1.1*(td_endzone-50)+50, scores[td_index], color=td_color,
+                        fontweight='bold', fontsize=13)
             if row.field_goal_result == 'made':
                 scores[index] += 3
-                ax.text(row.Time, 1.1*(endzone-50)+50, scores[index], fontweight='bold')
+                ax.text(row.Time, 1.1*(endzone-50)+50, scores[index], color=color,
+                        fontweight='bold', fontsize=13)
 
             last_time = row.Time
             last_pos = row.Position
@@ -279,6 +356,15 @@ def _(last_color, np, pd):
         ax.set_yticks(np.arange(-10, 111, 10))
         ax.set_yticklabels(['', 0, 10, 20, 30, 40, 50, 40, 30, 20, 10, 0, ''])
 
+        # each team's name in the end zone it defends
+        for team, color, y in [(home, home_color, -5), (away, away_color, 105)]:
+            ax.text(0.005, y, teams.team_nick[team], transform=ax.get_yaxis_transform(),
+                    color=color, fontweight='bold', fontsize=13, va='center')
+
+        date = pd.Timestamp(df.game_date.iloc[0])
+        ax.set_title(f'{teams.team_name[away]} at {teams.team_name[home]}, '
+                     f'{date:%B} {date.day}, {date.year}')
+
         ax.set_xlim(0, 60*15*4)
         ax.set_ylim(-10, 110)
 
@@ -286,16 +372,10 @@ def _(last_color, np, pd):
 
 
 @app.cell
-def _(df, plot_game, plt):
+def _(df, plot_game, plt, teams):
     fig, ax = plt.subplots(figsize=(25,8))
-    plot_game(ax, df)
+    plot_game(ax, df, teams)
     fig
-    return
-
-
-@app.cell
-def _(COmm):
-    COmm
     return
 
 
