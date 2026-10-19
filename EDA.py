@@ -248,8 +248,11 @@ def _(last_color, np, pd):
             # draw scores
             if row.touchdown == 1:
                 # need ot handle extra point(s)
-                scores[index] += 7
-                ax.text(row.Time, 1.1*(endzone-50)+50, scores[index], fontweight='bold')
+                # td_team, since the defense can score too (e.g. a fumble return)
+                td_index = 1 if row.td_team == 'IND' else 0
+                td_endzone = 0 if row.td_team == 'IND' else 100
+                scores[td_index] += 7
+                ax.text(row.Time, 1.1*(td_endzone-50)+50, scores[td_index], fontweight='bold')
             if row.field_goal_result == 'made':
                 scores[index] += 3
                 ax.text(row.Time, 1.1*(endzone-50)+50, scores[index], fontweight='bold')
@@ -291,7 +294,8 @@ def _(df, plot_game, plt):
 
 
 @app.cell
-def _():
+def _(COmm):
+    COmm
     return
 
 
