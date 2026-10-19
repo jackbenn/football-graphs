@@ -106,3 +106,6 @@ venv.bak/
 # Claude Code: personal, never committed
 **/.claude/settings.local.json
 **/CLAUDE.local.md
+
+# Downloaded data; the notebook fetches it
+data/
