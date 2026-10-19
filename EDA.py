@@ -289,11 +289,14 @@ def _(df):
 
 @app.cell
 def _(last_color, np, pd, pick_colors):
-    def plot_game(ax, df, teams):
+    def plot_game(ax, df, teams, x_axis='play'):
+        """Plot a game; x_axis is 'time' for game clock or 'play' for play number"""
         home, away = df.home_team.iloc[0], df.away_team.iloc[0]
         home_color, away_color = pick_colors(teams, home, away)
         last_pos = None
-        last_time = None
+        last_x = None
+        play = 0
+        quarter_starts = {}    # quarter -> play number of its first play
         last_type = None
         scores = [0,0]
         for i, row in df.iterrows():
@@ -304,20 +307,23 @@ def _(last_color, np, pd, pick_colors):
                 offense, defense = row.defteam, row.posteam
             else:
                 offense, defense = row.posteam, row.defteam
+            play += 1
+            quarter_starts.setdefault(row.qtr, play)
+            x = row.Time if x_axis == 'time' else play
             index = 0 if defense == home else 1
             endzone = 0 if defense == home else 100
             color = home_color if offense == home else away_color
 
             if row.play_type == 'kickoff':
-                ax.scatter([row.Time], [row.Position], marker="*", s=200, color=color)
+                ax.scatter([x], [row.Position], marker="*", s=200, color=color)
                 if last_type is not None:
-                    ax.plot([last_time, row.Time], [last_pos, endzone], color=last_color, lw=0.5)
+                    ax.plot([last_x, x], [last_pos, endzone], color=last_color, lw=0.5)
             else:
                 if row.down == 1:
-                    ax.scatter([row.Time], [row.Position], marker="o", color=color)
+                    ax.scatter([x], [row.Position], marker="o", color=color)
                 else:
-                    ax.scatter([row.Time], [row.Position], marker=".", color=color, lw=0.5)
-                ax.plot([last_time, row.Time], [last_pos, row.Position], color=last_color, lw=0.5)
+                    ax.scatter([x], [row.Position], marker=".", color=color, lw=0.5)
+                ax.plot([last_x, x], [last_pos, row.Position], color=last_color, lw=0.5)
 
             # draw scores
             if row.touchdown == 1:
@@ -327,32 +333,44 @@ def _(last_color, np, pd, pick_colors):
                 td_endzone = 100 if row.td_team == home else 0
                 td_color = home_color if row.td_team == home else away_color
                 scores[td_index] += 7
-                ax.text(row.Time, 1.1*(td_endzone-50)+50, scores[td_index], color=td_color,
+                ax.text(x, 1.1*(td_endzone-50)+50, scores[td_index], color=td_color,
                         fontweight='bold', fontsize=13)
             if row.field_goal_result == 'made':
                 scores[index] += 3
-                ax.text(row.Time, 1.1*(endzone-50)+50, scores[index], color=color,
+                ax.text(x, 1.1*(endzone-50)+50, scores[index], color=color,
                         fontweight='bold', fontsize=13)
 
-            last_time = row.Time
+            last_x = x
             last_pos = row.Position
             last_type = row.play_type
             last_color = color
-        ax.axvline(15*60, color='k', lw=1)             # ends of quarters
-        ax.axvline(2*15*60, color='k')
-        ax.axvline(3*15*60, color='k', lw=1)
-        ax.axvline(28*60, color='grey', lw=0.5)  # two-minute warning
-        ax.axvline(58*60, color='grey', lw=0.5)
+        if x_axis == 'time':
+            ax.axvline(15*60, color='k', lw=1)             # ends of quarters
+            ax.axvline(2*15*60, color='k')
+            ax.axvline(3*15*60, color='k', lw=1)
+            ax.axvline(28*60, color='grey', lw=0.5)  # two-minute warning
+            ax.axvline(58*60, color='grey', lw=0.5)
+
+            xticks = np.array([0, 5, 10, 15, 20, 25, 28]) + np.array([[0], [30]])
+            xticks = xticks.flatten() * 60
+            ax.set_xticks(xticks)
+            ax.set_xticklabels(['Q1', 10, 5, 'Q2', 10, 5, 2, 'Q3', 10, 5, 'Q4', 10, 5, 2])
+            ax.set_xlim(0, 60*15*4)
+        else:
+            # quarters start between the last play of one and the first of the next
+            starts = {q: (0 if q == 1 else first - 0.5) for q, first in quarter_starts.items()}
+            for q, x in starts.items():
+                if q > 1:
+                    ax.axvline(x, color='k', lw=1.5 if q == 3 else 1)
+            ax.set_xticks(list(starts.values()))
+            ax.set_xticklabels([f'Q{q}' if q <= 4 else 'OT' for q in starts])
+            ax.set_xlim(0, play + 1)
         for line in range(10, 100, 10):
             ax.axhline(line, color='k', lw=0.3)
         ax.axhline(0, color='k', lw=0.5)
         ax.axhline(100, color='k', lw=0.5)
         ax.axhline(50, color='k', lw=0.5)
 
-        xticks = np.array([0, 5, 10, 15, 20, 25, 28]) + np.array([[0], [30]])
-        xticks = xticks.flatten() * 60
-        ax.set_xticks(xticks)
-        ax.set_xticklabels(['Q1', 10, 5, 'Q2', 10, 5, 2, 'Q3', 10, 5, 'Q4', 10, 5, 2])
         ax.set_yticks(np.arange(-10, 111, 10))
         ax.set_yticklabels(['', 0, 10, 20, 30, 40, 50, 40, 30, 20, 10, 0, ''])
 
@@ -365,7 +383,6 @@ def _(last_color, np, pd, pick_colors):
         ax.set_title(f'{teams.team_name[away]} at {teams.team_name[home]}, '
                      f'{date:%B} {date.day}, {date.year}')
 
-        ax.set_xlim(0, 60*15*4)
         ax.set_ylim(-10, 110)
 
     return (plot_game,)
@@ -376,6 +393,14 @@ def _(df, plot_game, plt, teams):
     fig, ax = plt.subplots(figsize=(25,8))
     plot_game(ax, df, teams)
     fig
+    return
+
+
+@app.cell
+def _(df, plot_game, plt, teams):
+    _fig, _ax = plt.subplots(figsize=(25,8))
+    plot_game(_ax, df, teams, x_axis='time')
+    _fig
     return
 
 
