@@ -10,7 +10,7 @@ single game.
 ## [FBALL-1] Collaborate with Claude inside the notebook
 
 - **Status:** idea
-- **Priority:** unknown
+- **Priority:** P2
 - **Size:** session
 - **Depends on:** none
 - **Tags:** exploration
