@@ -288,17 +288,33 @@ def _(df):
 
 
 @app.cell
-def _(last_color, np, pd, pick_colors):
+def _(np, pd, pick_colors, plt):
     def plot_game(ax, df, teams, x_axis='play'):
         """Plot a game; x_axis is 'time' for game clock or 'play' for play number"""
         home, away = df.home_team.iloc[0], df.away_team.iloc[0]
         home_color, away_color = pick_colors(teams, home, away)
-        last_pos = None
-        last_x = None
+        colors = {home: home_color, away: away_color}
+        target = {home: 100, away: 0}    # the end zone each team drives toward
+        scores = {home: 0, away: 0}
+        # line style for the play that starts at each point
+        styles = {'run': '-', 'qb_kneel': '-', 'pass': ':', 'qb_spike': ':',
+                  'kickoff': '--', 'punt': '--', 'field_goal': '--', 'extra_point': '--',
+                  'no_play': '-.'}
         play = 0
         quarter_starts = {}    # quarter -> play number of its first play
-        last_type = None
-        scores = [0,0]
+        last = None        # (x, position, play type, color) of the previous play
+        last_end = None    # the end zone the previous play ended in, if it did
+
+        labels = {}    # each team's latest score label
+
+        def score(team, points, conversion=False):
+            scores[team] += points
+            if conversion:    # update the label already at the touchdown
+                labels[team].set_text(scores[team])
+            else:
+                labels[team] = ax.text(x, 1.1*(target[team]-50)+50, scores[team], color=colors[team],
+                                       fontweight='bold', fontsize=13)
+
         for i, row in df.iterrows():
             if pd.isna(row.play_type) or pd.isna(row.posteam):    # not plays; timeouts
                 continue
@@ -310,40 +326,49 @@ def _(last_color, np, pd, pick_colors):
             play += 1
             quarter_starts.setdefault(row.qtr, play)
             x = row.Time if x_axis == 'time' else play
-            index = 0 if defense == home else 1
-            endzone = 0 if defense == home else 100
-            color = home_color if offense == home else away_color
+            color = colors[offense]
+
+            # the line for the previous play: into the end zone it ended in, or else
+            # to this play's spot, except that a kickoff starts a new possession
+            if last is not None and (last_end is not None or row.play_type != 'kickoff'):
+                last_x, last_pos, last_type, last_color = last
+                ax.plot([last_x, x], [last_pos, row.Position if last_end is None else last_end],
+                        color=last_color, lw=1, ls=styles.get(last_type, '-'))
 
             if row.play_type == 'kickoff':
                 ax.scatter([x], [row.Position], marker="*", s=200, color=color)
-                if last_type is not None:
-                    ax.plot([last_x, x], [last_pos, endzone], color=last_color, lw=0.5)
+            elif row.down == 1:
+                ax.scatter([x], [row.Position], marker="o", color=color)
             else:
-                if row.down == 1:
-                    ax.scatter([x], [row.Position], marker="o", color=color)
-                else:
-                    ax.scatter([x], [row.Position], marker=".", color=color, lw=0.5)
-                ax.plot([last_x, x], [last_pos, row.Position], color=last_color, lw=0.5)
+                ax.scatter([x], [row.Position], marker=".", color=color, lw=0.5)
 
-            # draw scores
+            # draw scores, and note the end zone the play ended in, if any
+            last_end = None
             if row.touchdown == 1:
-                # need ot handle extra point(s)
                 # td_team, since the defense can score too (e.g. a fumble return)
-                td_index = 1 if row.td_team == home else 0
-                td_endzone = 100 if row.td_team == home else 0
-                td_color = home_color if row.td_team == home else away_color
-                scores[td_index] += 7
-                ax.text(x, 1.1*(td_endzone-50)+50, scores[td_index], color=td_color,
-                        fontweight='bold', fontsize=13)
+                score(row.td_team, 6)
+                last_end = target[row.td_team]
             if row.field_goal_result == 'made':
-                scores[index] += 3
-                ax.text(x, 1.1*(endzone-50)+50, scores[index], color=color,
-                        fontweight='bold', fontsize=13)
+                score(offense, 3)
+                last_end = target[offense]
+            if row.play_type == 'extra_point':    # good or not, it's kicked at the goal
+                last_end = target[offense]
+            if row.extra_point_result == 'good':
+                score(offense, 1, conversion=True)
+            if row.two_point_conv_result == 'success':
+                score(offense, 2, conversion=True)
+                last_end = target[offense]
+            # a safety usually scores for the defense, but for the kicking team when
+            # the receiving team gives one up on a return; the score columns say which
+            if row.safety == 1:
+                scorer = row.posteam if row.posteam_score_post > row.posteam_score else row.defteam
+                score(scorer, 2)
+                last_end = target[scorer]
+            if row.defensive_two_point_conv == 1:
+                score(row.defteam, 2)
+                last_end = target[row.defteam]
 
-            last_x = x
-            last_pos = row.Position
-            last_type = row.play_type
-            last_color = color
+            last = (x, row.Position, row.play_type, color)
         if x_axis == 'time':
             ax.axvline(15*60, color='k', lw=1)             # ends of quarters
             ax.axvline(2*15*60, color='k')
@@ -373,6 +398,11 @@ def _(last_color, np, pd, pick_colors):
 
         ax.set_yticks(np.arange(-10, 111, 10))
         ax.set_yticklabels(['', 0, 10, 20, 30, 40, 50, 40, 30, 20, 10, 0, ''])
+
+        ax.legend(handles=[plt.Line2D([], [], color='k', lw=1, ls=ls, label=label)
+                           for label, ls in [('run', '-'), ('pass', ':'), ('kick', '--'),
+                                             ('no play (penalty)', '-.')]],
+                  loc='lower right', bbox_to_anchor=(1, 1), ncol=4, frameon=False)
 
         # each team's name in the end zone it defends
         for team, color, y in [(home, home_color, -5), (away, away_color, 105)]:
