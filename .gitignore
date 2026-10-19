@@ -109,3 +109,6 @@ venv.bak/
 
 # Downloaded data; the notebook fetches it
 data/
+
+# marimo session cache, which holds cell outputs
+__marimo__/
