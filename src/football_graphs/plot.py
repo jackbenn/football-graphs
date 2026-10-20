@@ -1,4 +1,11 @@
-"""Drawing a game."""
+"""Drawing a game with matplotlib.
+
+Deprecated: the game page draws games with D3 (web/draw.js), and new features,
+such as the clock bars, go there only. This stays for the notebook until it
+goes too.
+"""
+
+import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,13 +20,16 @@ STYLES = {'run': '-', 'qb_kneel': '-', 'pass': ':', 'qb_spike': ':',
 
 
 def plot_game(ax, df, teams, x_axis='play'):
-    """Plot a game; x_axis is 'time' for game clock or 'play' for play number"""
+    """Plot a game; x_axis is 'time' for game clock or 'play' for play number.
+    Deprecated, as the module is."""
     draw_game(ax, game_data(df, teams), x_axis)
 
 
 def draw_game(ax, game, x_axis='play'):
     """Draw a game from game_data; x_axis is 'time' for game clock or 'play' for
-    play number"""
+    play number. Deprecated, as the module is."""
+    warnings.warn('football_graphs.plot is deprecated: the game page draws games with D3',
+                  DeprecationWarning, stacklevel=2)
     home, away, teams = game['home'], game['away'], game['teams']
     target = {home: 100, away: 0}    # the end zone each team drives toward
 

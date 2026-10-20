@@ -8,8 +8,11 @@ play, in the two teams' colors, with the score marked at each score.
 The code is a Python package, `football_graphs` in `src/`: `data` downloads
 and loads the play-by-play, `colors` picks the teams' colors, `game` turns a
 game's plays into plain data (line segments, markers, score labels, quarter
-starts) that can be saved as JSON, and `plot` draws that with matplotlib. A [marimo](https://marimo.io) notebook, `EDA.py`, uses it to
-explore the 2018 season and plot one game. The plan, including a page at
+starts, each play's clock time) that can be saved as JSON, and `build` writes
+that out for the game page in `web/`, which draws it with D3. `plot` draws it
+with matplotlib, but is deprecated: new features go to the page only. A
+[marimo](https://marimo.io) notebook, `EDA.py`, uses it to explore the 2018
+season and plot one game. The plan, including a page at
 bennetto.com/football, is in [`BACKLOG.md`](BACKLOG.md).
 
 ## Getting started
