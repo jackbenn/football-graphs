@@ -30,7 +30,7 @@ page (FBALL-13), which shares the play-number x axis.
 
 ## [FBALL-7] Bar graph of the clock time each play takes
 
-- **Status:** idea
+- **Status:** active
 - **Priority:** P3
 - **Size:** session
 - **Depends on:** none
@@ -55,6 +55,35 @@ timeouts called after it, so the bars' lengths are there. Still to add, in
 `game_data`, where it can be tested: the reason the clock stopped, from the
 columns above, and the last play of each quarter running to the quarter's
 end rather than to the next snap.
+
+Started 2026-10-19. Each play in `game_data` now has `duration`, the
+seconds of game clock to the next snap (to the end of the period for the
+last play of one), and `stop`, the first that applies of: `quarter_end`,
+`two_minute_warning`, `timeout`, `score` (tries included), `turnover`
+(interception, lost fumble, turnover on downs), `kick`, `incomplete`
+(spikes included), `penalty`, `out_of_bounds`, else `running`. What the
+2018 season showed:
+- Out of bounds stops the clock for good only in the last 2:00 of the first
+  half and the last 5:00 of the second half and of overtime (overtime
+  follows the five-minute rule in the data). Earlier it restarts at the
+  ready signal, taking about 34 s against 39 s for a running play, so it
+  counts as `running`.
+- A penalty counts at any time: an incomplete pass wiped out by a penalty
+  has `incomplete_pass` 0, so `penalty` is the only sign the clock stopped.
+- 46 plays in 2018 are out of order by `play_id`, so the clock runs
+  backwards; their `duration` is None. Sorting by clock instead would
+  move them in the main plot too, so it is left alone.
+- The page groups the ten reasons into eight colors: kicks and turnovers
+  as "change of possession", the two-minute warning with the end of the
+  quarter. Bars are clipped at 1:00; each has a tooltip.
+
+### Acceptance criteria
+- [x] Each play in `game_data` has its clock `duration` and a `stop` reason,
+  tested on hand-built games and checked across the 2018 season
+- [x] The page draws a bar per play below the game graph, sharing its x
+  axis, colored by `stop`, with a legend
+- [ ] The notebook's matplotlib plot gets the same panel, or it is decided
+  that it stays D3-only
 
 ## [FBALL-8] Graphical cleanup of the game plot
 

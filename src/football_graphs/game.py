@@ -10,16 +10,50 @@ COLUMNS = ['game_id', 'home_team', 'away_team', 'game_date', 'qtr', 'quarter_sec
            'play_type', 'posteam', 'defteam', 'yardline_100', 'down', 'touchdown', 'td_team',
            'field_goal_result', 'extra_point_result', 'two_point_conv_result', 'safety',
            'posteam_score', 'posteam_score_post', 'defensive_two_point_conv', 'ydstogo', 'desc',
-           'timeout', 'timeout_team']
+           'timeout', 'timeout_team', 'incomplete_pass', 'out_of_bounds', 'penalty', 'interception',
+           'fumble_lost', 'fourth_down_failed']
+
+
+def late(quarter, clock):
+    """Whether the clock stops for good when a play goes out of bounds: in the
+    last two minutes of the first half, or the last five of the second half or
+    of overtime. Earlier, it restarts when the ball is ready for play, so the
+    clock is taken as running."""
+    return clock <= (120 if quarter == 2 else 300 if quarter >= 4 else -1)
+
+
+def clock_stop(row):
+    """What stopped the clock after a play, as far as the play's own columns tell:
+    the first that applies of a score (or a try after a touchdown), a turnover, a
+    kick, an incomplete pass, a penalty (such as one that cancels an incomplete
+    pass, or an offside before the snap), and going out of bounds late in a half;
+    else 'running'. add_clock_stops puts a timeout, the two-minute warning and
+    the end of a quarter ahead of these."""
+    if (row.touchdown == 1 or row.field_goal_result == 'made' or row.safety == 1
+            or row.play_type == 'extra_point' or pd.notna(row.two_point_conv_result)):
+        return 'score'
+    if row.interception == 1 or row.fumble_lost == 1 or row.fourth_down_failed == 1:
+        return 'turnover'
+    if row.play_type in ('kickoff', 'punt', 'field_goal'):
+        return 'kick'
+    if row.incomplete_pass == 1:    # spikes too
+        return 'incomplete'
+    if row.penalty == 1:
+        return 'penalty'
+    if row.out_of_bounds == 1 and late(row.qtr, row.quarter_seconds_remaining):
+        return 'out_of_bounds'
+    return 'running'
 
 
 def game_data(df, teams):
     """What a plot of the game shows, as plain data that can be saved as JSON:
     the teams, each play (where its marker goes, and its details: the clock, down
-    and distance, description, the score after it and any timeouts called after
-    it), a line segment for each play, the score labels, and where each quarter
-    starts. Every point has both an x for the play number (`play`) and one for
-    the game clock in seconds (`time`), and a `y` from add_yards_column."""
+    and distance, description, the score after it, any timeouts called after it,
+    and how many seconds of game clock it took and what stopped the clock, as in
+    add_clock_stops), a line segment for each play, the score labels, and where
+    each quarter starts. Every point has both an x for the play number (`play`)
+    and one for the game clock in seconds (`time`), and a `y` from
+    add_yards_column."""
     home, away = df.home_team.iloc[0], df.away_team.iloc[0]
     home_color, away_color = pick_colors(teams, home, away)
     colors = {home: home_color, away: away_color}
@@ -73,7 +107,7 @@ def game_data(df, teams):
                           clock=int(row.quarter_seconds_remaining),
                           down=None if pd.isna(row.down) else int(row.down),
                           distance=None if pd.isna(row.down) else int(row.ydstogo),
-                          desc=row.desc, timeouts=[]))
+                          desc=row.desc, timeouts=[], stop=clock_stop(row)))
 
         # scores, and the end zone the play ended in, if any
         last_end = None
@@ -106,6 +140,8 @@ def game_data(df, teams):
             plays[-1]['timeouts'].append(row.timeout_team)
         last = dict(point, y=float(row.Position), play_type=row.play_type, color=color)
 
+    add_clock_stops(plays, df.groupby('qtr').Time.max())
+
     date = pd.Timestamp(df.game_date.iloc[0])
     return {
         'home': home,
@@ -122,3 +158,27 @@ def game_data(df, teams):
                      for q, first in quarter_starts.items()],
         'final_score': scores,
     }
+
+
+def add_clock_stops(plays, period_ends):
+    """Give each play its `duration`, the seconds of game clock from its snap to
+    the next one, or to the end of its period (from period_ends, the game time
+    at which each period ends) for the last play of one. Settle its `stop`, what
+    stopped the clock after it: the end of the quarter, the two-minute warning, or
+    a timeout, ahead of the reason clock_stop gave it.
+
+    A few plays are out of order in the data (46 in 2018), so that the clock runs
+    backwards, even into the quarter before; their duration is None."""
+    for play, after in zip(plays, plays[1:] + [None]):
+        if after is None or after['quarter'] > play['quarter']:
+            play['duration'] = float(period_ends[play['quarter']]) - play['time']
+            play['stop'] = 'quarter_end'
+            continue
+        duration = after['time'] - play['time']
+        play['duration'] = duration if duration >= 0 else None
+        if play['duration'] is None:
+            continue
+        if play['quarter'] in (2, 4, 5, 6) and play['clock'] > 120 >= after['clock']:
+            play['stop'] = 'two_minute_warning'
+        elif play['timeouts']:
+            play['stop'] = 'timeout'

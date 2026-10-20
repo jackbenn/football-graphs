@@ -37,3 +37,14 @@ def test_labels_apart(games):
         for team in (game['home'], game['away']):
             plays = [label['play'] for label in game['labels'] if label['team'] == team]
             assert all(b - a >= 2 for a, b in zip(plays, plays[1:])), (game_id, team, plays)
+
+
+def test_clock_stops(games):
+    """Every play has a known stop, and a duration that is never negative; only a
+    few, out of order in the data, have none"""
+    stops = {'quarter_end', 'two_minute_warning', 'timeout', 'score', 'turnover', 'kick',
+             'incomplete', 'penalty', 'out_of_bounds', 'running'}
+    plays = [play for df, game in games.values() for play in game['plays']]
+    assert {play['stop'] for play in plays} == stops
+    assert all(play['duration'] is None or play['duration'] >= 0 for play in plays)
+    assert sum(play['duration'] is None for play in plays) < len(plays) / 500

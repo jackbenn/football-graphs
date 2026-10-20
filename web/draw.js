@@ -1,8 +1,10 @@
 // Drawing a game from its game_data JSON with D3: the port of draw_game in
-// src/football_graphs/plot.py, by play number.
+// src/football_graphs/plot.py, by play number, and below it a bar for each play
+// of the clock time it took, colored by what stopped the clock.
 
-const WIDTH = 1250, HEIGHT = 400;
+const WIDTH = 1250, GAME_HEIGHT = 400, HEIGHT = 530;
 const MARGIN = {top: 44, right: 12, bottom: 28, left: 34};
+const CLOCK = {top: 412, bottom: 492, most: 60};    // the clock panel, in pixels, and its top in seconds
 
 // dash pattern for the play that starts at each point, as in plot.py's STYLES
 const SOLID = null, DOTTED = '1.5 2.5', DASHED = '6 3', DASHDOT = '8 3 1.5 3';
@@ -11,6 +13,22 @@ const STYLES = {run: SOLID, qb_kneel: SOLID, pass: DOTTED, qb_spike: DOTTED,
                 no_play: DASHDOT};
 const LEGEND = [['run', SOLID], ['pass', DOTTED], ['kick', DASHED], ['no play (penalty)', DASHDOT]];
 
+// what stopped the clock after each play, in the order of the legend; game_data's
+// reasons, with the kicks and turnovers together as changes of possession, and the
+// two-minute warning with the end of the quarter
+const STOPS = [
+  {label: 'clock running', color: '#a3a29c', stops: ['running']},
+  {label: 'incomplete pass', color: '#2a78d6', stops: ['incomplete']},
+  {label: 'out of bounds', color: '#eb6834', stops: ['out_of_bounds']},
+  {label: 'timeout', color: '#1baf7a', stops: ['timeout']},
+  {label: 'two-minute warning or end of quarter', color: '#eda100',
+   stops: ['two_minute_warning', 'quarter_end']},
+  {label: 'penalty', color: '#e87ba4', stops: ['penalty']},
+  {label: 'score', color: '#008300', stops: ['score']},
+  {label: 'change of possession', color: '#6250d6', stops: ['kick', 'turnover']},
+];
+const STOP = Object.fromEntries(STOPS.flatMap(group => group.stops.map(stop => [stop, group])));
+
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
                 'August', 'September', 'October', 'November', 'December'];
 
@@ -18,7 +36,7 @@ export function drawGame(svg, game) {
   const {home, away, teams} = game;
   const target = {[home]: 100, [away]: 0};    // the end zone each team drives toward
   const x = d3.scaleLinear([0, game.plays.length + 1], [MARGIN.left, WIDTH - MARGIN.right]);
-  const y = d3.scaleLinear([-10, 110], [HEIGHT - MARGIN.bottom, MARGIN.top]);
+  const y = d3.scaleLinear([-10, 110], [GAME_HEIGHT - MARGIN.bottom, MARGIN.top]);
 
   svg = d3.select(svg);
   svg.selectAll('*').remove();
@@ -111,5 +129,63 @@ export function drawGame(svg, game) {
       .attr('x1', right - width - 30).attr('x2', right - width - 6)
       .attr('stroke', 'black').attr('stroke-width', 1).attr('stroke-dasharray', dash);
     right -= width + 46;
+  });
+
+  drawClock(svg, game, x);
+}
+
+// a bar for each play of the clock time it took, up to CLOCK.most seconds, in
+// the color of what stopped the clock, with the quarters marked as above
+function drawClock(svg, game, x) {
+  const y = d3.scaleLinear([0, CLOCK.most], [CLOCK.bottom, CLOCK.top]).clamp(true);
+  const width = Math.max(1, x(1) - x(0) - 1.5);
+
+  svg.append('g').selectAll('line')
+    .data(y.ticks(3).filter(d => d > 0))
+    .join('line')
+    .attr('x1', x.range()[0]).attr('x2', x.range()[1])
+    .attr('y1', y).attr('y2', y)
+    .attr('stroke', 'black').attr('stroke-width', 0.2);
+  svg.append('g').selectAll('line')
+    .data(game.quarters.filter(q => q.quarter > 1))
+    .join('line')
+    .attr('x1', q => x(q.play)).attr('x2', q => x(q.play))
+    .attr('y1', CLOCK.bottom).attr('y2', CLOCK.top)
+    .attr('stroke', 'black').attr('stroke-width', q => q.quarter === 3 ? 1.5 : 1);
+
+  const clock = seconds => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  svg.append('g').selectAll('rect')
+    .data(game.plays.filter(p => p.duration !== null))
+    .join('rect')
+    .attr('x', p => x(p.play) - width / 2).attr('width', width)
+    .attr('y', p => y(p.duration)).attr('height', p => CLOCK.bottom - y(p.duration))
+    .attr('fill', p => STOP[p.stop].color)
+    .append('title')
+    .text(p => `${p.quarter <= 4 ? `Q${p.quarter}` : 'OT'} ${clock(p.clock)}: ` +
+               `${p.duration} seconds, ${STOP[p.stop].label}`);
+
+  svg.append('g')
+    .attr('transform', `translate(${x.range()[0]},0)`)
+    .call(d3.axisLeft(y)
+      .ticks(3)
+      .tickFormat(d => d === 0 ? '' : clock(d)));
+  svg.append('rect')
+    .attr('x', x.range()[0]).attr('y', CLOCK.top)
+    .attr('width', x.range()[1] - x.range()[0]).attr('height', CLOCK.bottom - CLOCK.top)
+    .attr('fill', 'none').attr('stroke', 'black').attr('stroke-width', 0.8);
+
+  const legend = svg.append('g')
+    .attr('transform', `translate(${x.range()[0]},${CLOCK.bottom + 18})`)
+    .selectAll('g')
+    .data(STOPS)
+    .join('g');
+  let left = 0;
+  legend.each(function ({label, color}) {
+    const item = d3.select(this);
+    item.append('rect').attr('x', left).attr('y', -5).attr('width', 10).attr('height', 10)
+      .attr('fill', color);
+    const text = item.append('text').attr('class', 'legend').attr('x', left + 14)
+      .attr('dominant-baseline', 'central').text(label);
+    left += 14 + text.node().getComputedTextLength() + 18;
   });
 }

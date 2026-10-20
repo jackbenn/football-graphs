@@ -40,7 +40,8 @@ def game(*plays):
                     td_team=np.nan, field_goal_result=np.nan, extra_point_result=np.nan,
                     two_point_conv_result=np.nan, safety=0, posteam_score=0,
                     posteam_score_post=0, defensive_two_point_conv=0, desc='a play',
-                    timeout=0, timeout_team=np.nan)
+                    timeout=0, timeout_team=np.nan, incomplete_pass=0, out_of_bounds=0,
+                    penalty=0, interception=0, fumble_lost=0, fourth_down_failed=0)
     df = pd.DataFrame([{**ordinary, 'quarter_seconds_remaining': 900 - 30*i, **play}
                        for i, play in enumerate(plays)])
     add_time_column(df)
@@ -158,3 +159,55 @@ def test_overtime_clock():
                     kickoff(AWAY, qtr=5, quarter_seconds_remaining=length),
                     snap('run', HOME, 75, qtr=5, quarter_seconds_remaining=length - 5))
         assert [play['time'] for play in data['plays']] == [3590, 3600, 3605]
+
+
+def stops(data):
+    return [(play['duration'], play['stop']) for play in data['plays']]
+
+
+def test_clock_stops():
+    """Each play's duration runs to the next snap, and its stop is what the play
+    did to the clock; the last play of a quarter runs to its end"""
+    timeout = dict(play_type='no_play', posteam=np.nan, defteam=np.nan, yardline_100=np.nan,
+                   timeout=1, timeout_team=HOME)
+    data = game(kickoff(HOME),
+                snap('run', AWAY, 75),
+                snap('pass', AWAY, 75, down=2, incomplete_pass=1),
+                snap('no_play', AWAY, 75, down=3, penalty=1),
+                snap('run', AWAY, 70, down=3, out_of_bounds=1),    # early: the clock restarts
+                snap('pass', AWAY, 60, interception=1),
+                snap('run', HOME, 40),
+                timeout,
+                snap('pass', HOME, 35, down=2, touchdown=1, td_team=HOME),
+                snap('extra_point', HOME, 15, down=np.nan, extra_point_result='good'),
+                kickoff(AWAY, quarter_seconds_remaining=300),
+                snap('run', HOME, 75, quarter_seconds_remaining=290),
+                dict(play_type=np.nan, posteam=np.nan, defteam=np.nan, yardline_100=np.nan,
+                     desc='END QUARTER 1', quarter_seconds_remaining=0))
+    assert stops(data) == [(30, 'kick'), (30, 'running'), (30, 'incomplete'), (30, 'penalty'),
+                           (30, 'running'), (30, 'turnover'), (60, 'timeout'), (30, 'score'),
+                           (330, 'score'), (10, 'kick'), (290, 'quarter_end')]
+
+
+def test_clock_stops_late():
+    """The two-minute warning, and going out of bounds late in a half"""
+    end_of_half = dict(play_type=np.nan, posteam=np.nan, defteam=np.nan, yardline_100=np.nan,
+                       desc='END QUARTER 2', qtr=2, quarter_seconds_remaining=0)
+    data = game(snap('run', AWAY, 75, qtr=2, quarter_seconds_remaining=150),
+                snap('run', AWAY, 70, qtr=2, quarter_seconds_remaining=120, out_of_bounds=1),
+                snap('run', AWAY, 60, qtr=2, quarter_seconds_remaining=115),
+                end_of_half,
+                snap('run', AWAY, 60, qtr=4, quarter_seconds_remaining=310, out_of_bounds=1),
+                snap('run', AWAY, 50, qtr=4, quarter_seconds_remaining=280, out_of_bounds=1),
+                snap('run', AWAY, 40, qtr=4, quarter_seconds_remaining=275))
+    assert stops(data) == [(30, 'two_minute_warning'), (5, 'out_of_bounds'), (115, 'quarter_end'),
+                           (30, 'running'), (5, 'out_of_bounds'), (0, 'quarter_end')]
+
+
+def test_clock_runs_backwards():
+    """A play out of order in the data, here one from the quarter before, leaves
+    the play before it with no duration, and doesn't end that play's quarter"""
+    data = game(snap('run', AWAY, 75, qtr=2, quarter_seconds_remaining=400),
+                snap('run', AWAY, 70, qtr=1, quarter_seconds_remaining=10),
+                snap('run', AWAY, 65, qtr=2, quarter_seconds_remaining=370))
+    assert stops(data)[0] == (None, 'running')
