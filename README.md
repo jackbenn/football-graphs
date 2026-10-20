@@ -39,6 +39,17 @@ by git. Change `_year` in that cell for another season, and the year and
 `EDA.py` is plain Python, so it also runs as a script once the data is
 downloaded: `.venv/bin/python EDA.py`.
 
+## Tests
+
+```bash
+.venv/bin/pytest                  # everything, about 15 seconds
+.venv/bin/pytest -m "not slow"    # skip the checks of the whole 2018 season
+```
+
+The tests in `tests/test_game.py` build small games by hand for the scoring
+edge cases and need no data. The rest use the downloaded 2018 season and
+teams table, and are skipped without them.
+
 ## Data
 
 Play-by-play and team colors come from

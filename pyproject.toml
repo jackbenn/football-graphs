@@ -15,7 +15,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["marimo>=0.25"]
+dev = ["marimo>=0.25", "pytest>=9.1"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: checks every game of a season, using the downloaded data"]
 
 # re-run cells that use a module of the package when it changes
 [tool.marimo.runtime]
