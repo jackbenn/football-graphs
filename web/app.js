@@ -37,12 +37,20 @@ window.addEventListener('popstate', () =>
   showGame(new URLSearchParams(location.search).get('game') ?? games[0].game_id));
 
 async function showGame(gameId) {
+  let game;
   try {
-    drawGame(svg, await d3.json(`games/${gameId.slice(0, 4)}/${gameId}.json`));
-    message.textContent = '';
+    game = await d3.json(`games/${gameId.slice(0, 4)}/${gameId}.json`);
   } catch {
     message.textContent = `There is no game ${gameId}.`;
     return;
+  }
+  // a game that fails to draw is a bug, or files older than the page: say so
+  try {
+    drawGame(svg, game);
+    message.textContent = '';
+  } catch (error) {
+    message.textContent = `Could not draw ${gameId}: ${error.message}`;
+    console.error(error);
   }
   shown = gameId;
   listElement.querySelectorAll('tr').forEach(row =>
@@ -56,17 +64,20 @@ function choose(gameId) {
 }
 
 function buildFilters() {
+  // each option is [value, its text in the list, its text in the summary]
   const options = {
-    season: [...seasons].reverse().map(season => [season, season]),
-    week: WEEKS.map(week => [week, /^\d/.test(week) ? `Week ${week}` : week]),
-    team: Object.keys(teams).sort().map(team => [team, `${team} ${teams[team].nick}`]),
+    season: [...seasons].reverse().map(season => [season, seasonName(season), seasonName(season)]),
+    week: WEEKS.map(week => [week, /^\d/.test(week) ? `Week ${week}` : week, week]),
+    team: Object.keys(teams).sort().map(team => [team, `${team} ${teams[team].nick}`, team]),
   };
   const names = {season: 'Year', week: 'Week', team: 'Team'};
+  const single = {team: true};    // one team at a time; any number of the others
   for (const [key, values] of Object.entries(options)) {
+    const short = new Map(values.map(([value, , text]) => [value, text]));
     const details = d3.select(filtersElement).append('details').attr('class', 'filter');
     const summary = details.append('summary');
     const update = () => {
-      const chosen = [...filters[key]];
+      const chosen = values.filter(([value]) => filters[key].has(value)).map(([value]) => short.get(value));
       summary.text(`${names[key]}: ${chosen.length === 0 ? 'all'
         : chosen.length <= 3 ? chosen.join(', ') : `${chosen.length} chosen`}`);
     };
@@ -79,8 +90,10 @@ function buildFilters() {
       showList();
     });
     const label = box.selectAll('label').data(values).join('label');
-    label.append('input').attr('type', 'checkbox').attr('value', ([value]) => value)
+    label.append('input').attr('type', single[key] ? 'radio' : 'checkbox')
+      .attr('name', key).attr('value', ([value]) => value)
       .on('change', function () {
+        if (single[key]) filters[key].clear();
         this.checked ? filters[key].add(this.value) : filters[key].delete(this.value);
         update();
         page = 0;
@@ -95,6 +108,11 @@ function buildFilters() {
       if (!details.contains(event.target)) details.open = false;
     });
   });
+}
+
+// a season by the years it spans: 2026 is 2026–27
+function seasonName(season) {
+  return `${season}–${String(Number(season) + 1).slice(-2)}`;
 }
 
 function matches(game) {

@@ -22,6 +22,12 @@ How to set up and run the notebook is in `README.md`; the plan is in
 - **Check scoring changes against the whole season.** After changing how
   `plot_game` scores, check that every 2018 game ends on its real final
   score (`home_score`, `away_score`), not just the game on screen.
+- **A change to what the build writes** (`game_data`'s fields, the index)
+  leaves the published files behind. Before deploying a page that reads the
+  new format, rebuild every season in the `games` release
+  (`gh workflow run build-games.yml -f season=YEAR` for each), wait for the
+  runs, then fetch on the server
+  (`ssh website '~/bennetto-infra/scripts/fetch-football.sh'`).
 - **The data's quirks**, learned the hard way:
   - On kickoffs `posteam` is the receiving team; on punts it is the kicking
     team.
