@@ -1,0 +1,127 @@
+:root {
+  --text: black;
+  --muted: #555;
+  --line: #ddd;
+  --hover: #f2f2f2;
+  --shown: #e6eefc;
+}
+
+body {
+  margin: 0 16px;
+  background: white;
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+}
+
+svg.game {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-size: 11px;
+}
+
+svg.game .score, svg.game .team {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+svg.game .title {
+  font-size: 14px;
+}
+
+#message:empty {
+  display: none;
+}
+
+.picker {
+  max-width: 40em;
+}
+
+#filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  margin: 1em 0 0.5em;
+}
+
+.filter {
+  position: relative;
+}
+
+.filter summary {
+  cursor: pointer;
+  padding: 0.25em 0.6em;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  list-style: none;
+}
+
+.filter summary::after {
+  content: ' ▾';
+  color: var(--muted);
+}
+
+.filter .options {
+  position: absolute;
+  z-index: 1;
+  max-height: 20em;
+  overflow-y: auto;
+  min-width: 12em;
+  padding: 0.4em;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 15%);
+}
+
+.filter label {
+  display: block;
+  padding: 0.1em 0.2em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.filter button {
+  margin-bottom: 0.3em;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#games tr {
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+}
+
+#games tr:hover {
+  background: var(--hover);
+}
+
+#games tr.shown {
+  background: var(--shown);
+}
+
+#games td {
+  padding: 0.3em 0.5em;
+}
+
+#games .date, #games .week {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+#games .at {
+  color: var(--muted);
+}
+
+#pager {
+  margin: 0.6em 0;
+}
+
+footer {
+  margin: 1em 0;
+  font-size: 0.85em;
+  color: var(--muted);
+}

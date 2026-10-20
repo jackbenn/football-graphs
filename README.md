@@ -68,6 +68,19 @@ tab for any other season. GitHub pauses scheduled workflows after 60 days
 without activity in the repository, so it may need re-enabling each
 September.
 
+## The game page
+
+`web/` is the page for bennetto.com/football: static files with no build
+step, drawing a game in the browser with [D3](https://d3js.org) (vendored in
+`web/vendor/`, under its own ISC license) from the files the build writes.
+To try it locally, build a season or two, then
+
+```bash
+.venv/bin/python scripts/serve.py    # http://127.0.0.1:8000/football/
+```
+
+which serves the page and `games/` the way nginx does on the site.
+
 ## Data
 
 Play-by-play and team colors come from

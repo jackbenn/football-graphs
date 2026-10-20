@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Football graphs</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="vendor/d3.min.js"></script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <main>
+    <svg id="game" aria-label="Graph of the game"></svg>
+    <p id="message"></p>
+    <section class="picker">
+      <div id="filters"></div>
+      <table><tbody id="games"></tbody></table>
+      <div id="pager"></div>
+    </section>
+  </main>
+  <footer>
+    Play-by-play from <a href="https://github.com/nflverse/nflverse-data">nflverse</a>,
+    under <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>,
+    turned into graphs here.
+  </footer>
+</body>
+</html>
