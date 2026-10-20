@@ -36,5 +36,12 @@ def test_build_2018(teams, tmp_path):
     assert len(index['teams']) == 32
     files = {path.name for path in season_dir.iterdir()} - {'index.json.gz'}
     assert files == {f"{game['game_id']}.json.gz" for game in index['games']}
+    weeks = {}
+    for game in index['games']:
+        weeks[game['week']] = weeks.get(game['week'], 0) + 1
+    assert list(weeks) == [str(week) for week in range(1, 18)] + ['WC', 'DIV', 'CONF', 'SB']
+    assert sum(weeks[str(week)] for week in range(1, 18)) == 256
+    assert [weeks[round] for round in ['WC', 'DIV', 'CONF', 'SB']] == [4, 4, 2, 1]
+    assert index['games'][-1]['game_id'] == '2018_21_NE_LA'
     game = read(season_dir / '2018_01_ATL_PHI.json.gz')
     assert game['final_score'] == {'PHI': 18, 'ATL': 12}

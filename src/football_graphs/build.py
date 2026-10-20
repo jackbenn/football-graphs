@@ -17,6 +17,10 @@ from .game import COLUMNS, game_data
 # the columns the index needs, besides those game_data reads
 INDEX_COLUMNS = ['game_id', 'play_id', 'season_type', 'week', 'home_score', 'away_score']
 
+# the playoff rounds, in order; nflverse numbers playoff weeks on from the
+# regular season, whose length has changed, so the round comes from the order
+ROUNDS = ['WC', 'DIV', 'CONF', 'SB']
+
 
 def current_season(today=None):
     """The season under way, or the last one: a season runs from September to February"""
@@ -54,6 +58,13 @@ def build(season, data_dir='data', out='games', refresh=False):
                       'week': int(df.week.iloc[0]), 'date': game['date'],
                       'home': home, 'away': away, 'home_score': final[home], 'away_score': final[away]})
 
+    # each game's week as the page shows it: 1 to 18, or the playoff round
+    playoff_weeks = sorted({game['week'] for game in games if game['season_type'] == 'POST'})
+    for game in games:
+        if game['season_type'] == 'POST':
+            game['week'] = ROUNDS[playoff_weeks.index(game['week'])]
+        else:
+            game['week'] = str(game['week'])
     games.sort(key=lambda game: (game['date'], game['game_id']))
     playing = sorted({game['home'] for game in games} | {game['away'] for game in games})
     write_json(season_dir / 'index.json.gz', {
