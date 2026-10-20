@@ -35,16 +35,18 @@ def snap(play_type, offense, yardline_100, down=1, **columns):
 def game(*plays):
     """game_data for the plays given, each a dict of its columns that differ from
     a play that scores nothing, thirty seconds apart"""
-    ordinary = dict(home_team=HOME, away_team=AWAY, game_date='2018-09-09', qtr=1,
-                    down=np.nan, touchdown=0, td_team=np.nan, field_goal_result=np.nan,
-                    extra_point_result=np.nan, two_point_conv_result=np.nan, safety=0,
-                    posteam_score=0, posteam_score_post=0, defensive_two_point_conv=0)
+    ordinary = dict(game_id='2018_01_AWY_HOM', home_team=HOME, away_team=AWAY,
+                    game_date='2018-09-09', qtr=1, down=np.nan, ydstogo=10, touchdown=0,
+                    td_team=np.nan, field_goal_result=np.nan, extra_point_result=np.nan,
+                    two_point_conv_result=np.nan, safety=0, posteam_score=0,
+                    posteam_score_post=0, defensive_two_point_conv=0, desc='a play',
+                    timeout=0, timeout_team=np.nan)
     df = pd.DataFrame([{**ordinary, 'quarter_seconds_remaining': 900 - 30*i, **play}
                        for i, play in enumerate(plays)])
     add_time_column(df)
     add_yards_column(df)
     data = game_data(df, TEAMS)
-    json.dumps(data)
+    json.dumps(data, allow_nan=False)
     return data
 
 
@@ -114,8 +116,45 @@ def test_first_play_not_a_kickoff():
     data = game(dict(kickoff(HOME), play_type='no_play'),
                 kickoff(HOME, yardline_100=40),
                 snap('pass', AWAY, 75))
-    assert [marker['play'] for marker in data['markers']] == [1, 2, 3]
+    assert [play['play'] for play in data['plays']] == [1, 2, 3]
     assert [segment['play'] for segment in data['segments']] == [[2, 3]]
     assert data['quarters'] == [{'quarter': 1, 'play': 0, 'time': 0}]
-    assert data['plays'] == 3
     assert data['final_score'] == {HOME: 0, AWAY: 0}
+
+
+def test_plays():
+    """Each play's details, and the score after it: a touchdown is 6, and the
+    extra point makes it 7 on the next play"""
+    data = game(kickoff(HOME),
+                snap('pass', AWAY, 10, desc='a touchdown pass', touchdown=1, td_team=AWAY),
+                snap('extra_point', AWAY, 15, down=np.nan, extra_point_result='good'))
+    touchdown = data['plays'][1]
+    assert touchdown['offense'] == AWAY and touchdown['play_type'] == 'pass'
+    assert (touchdown['quarter'], touchdown['clock']) == (1, 870)
+    assert (touchdown['down'], touchdown['distance']) == (1, 10)
+    assert touchdown['desc'] == 'a touchdown pass'
+    assert [play['score'] for play in data['plays']] == [{HOME: 0, AWAY: 0}, {HOME: 0, AWAY: 6},
+                                                        {HOME: 0, AWAY: 7}]
+    assert data['plays'][0]['down'] is None and data['plays'][0]['distance'] is None
+
+
+def test_timeouts():
+    """A timeout goes with the play before it, whether it is its own row or is
+    recorded on that play, as a lost challenge is"""
+    timeout = dict(play_type='no_play', posteam=np.nan, defteam=np.nan, yardline_100=np.nan,
+                   timeout=1, timeout_team=HOME)
+    data = game(kickoff(HOME),
+                snap('run', AWAY, 75),
+                timeout,
+                snap('pass', AWAY, 70, down=2, timeout=1, timeout_team=HOME))
+    assert [play['timeouts'] for play in data['plays']] == [[], [HOME], [HOME]]
+
+
+def test_overtime_clock():
+    """Regular-season overtime is 10 minutes, playoff overtime 15; either way the
+    game clock carries on from the end of the fourth quarter"""
+    for length in (600, 900):
+        data = game(kickoff(HOME, qtr=4, quarter_seconds_remaining=10),
+                    kickoff(AWAY, qtr=5, quarter_seconds_remaining=length),
+                    snap('run', HOME, 75, qtr=5, quarter_seconds_remaining=length - 5))
+        assert [play['time'] for play in data['plays']] == [3590, 3600, 3605]

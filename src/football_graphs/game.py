@@ -6,24 +6,26 @@ from .colors import pick_colors
 
 # the play-by-play columns game_data reads, before add_time_column and
 # add_yards_column add theirs
-COLUMNS = ['home_team', 'away_team', 'game_date', 'qtr', 'quarter_seconds_remaining',
+COLUMNS = ['game_id', 'home_team', 'away_team', 'game_date', 'qtr', 'quarter_seconds_remaining',
            'play_type', 'posteam', 'defteam', 'yardline_100', 'down', 'touchdown', 'td_team',
            'field_goal_result', 'extra_point_result', 'two_point_conv_result', 'safety',
-           'posteam_score', 'posteam_score_post', 'defensive_two_point_conv']
+           'posteam_score', 'posteam_score_post', 'defensive_two_point_conv', 'ydstogo', 'desc',
+           'timeout', 'timeout_team']
 
 
 def game_data(df, teams):
     """What a plot of the game shows, as plain data that can be saved as JSON:
-    the teams, a line segment for each play, a marker at the start of each play,
-    the score labels, and where each quarter starts. Every point has both an x
-    for the play number (`play`) and one for the game clock (`time`), and a `y`
-    from add_yards_column."""
+    the teams, each play (where its marker goes, and its details: the clock, down
+    and distance, description, the score after it and any timeouts called after
+    it), a line segment for each play, the score labels, and where each quarter
+    starts. Every point has both an x for the play number (`play`) and one for
+    the game clock in seconds (`time`), and a `y` from add_yards_column."""
     home, away = df.home_team.iloc[0], df.away_team.iloc[0]
     home_color, away_color = pick_colors(teams, home, away)
     colors = {home: home_color, away: away_color}
     target = {home: 100, away: 0}    # the end zone each team drives toward
     scores = {home: 0, away: 0}
-    segments, markers, labels = [], [], []
+    segments, plays, labels = [], [], []
     play = 0
     quarter_starts = {}    # quarter -> play number of its first play
     last = None        # the point and color of the previous play, and its type
@@ -37,6 +39,9 @@ def game_data(df, teams):
             labels.append(dict(point, team=team, score=scores[team]))
 
     for i, row in df.iterrows():
+        # a timeout is its own row, or else on the play it follows, such as a lost challenge
+        if row.timeout == 1 and plays and not (pd.notna(row.play_type) and pd.notna(row.posteam)):
+            plays[-1]['timeouts'].append(row.timeout_team)
         if pd.isna(row.play_type) or pd.isna(row.posteam):    # not plays; timeouts
             continue
         # posteam is the receiving team on kickoffs; this wants the kicking team
@@ -63,7 +68,12 @@ def game_data(df, teams):
             kind = 'first_down'
         else:
             kind = 'play'
-        markers.append(dict(point, y=float(row.Position), kind=kind, color=color))
+        plays.append(dict(point, y=float(row.Position), kind=kind, color=color, offense=offense,
+                          play_type=row.play_type, quarter=int(row.qtr),
+                          clock=int(row.quarter_seconds_remaining),
+                          down=None if pd.isna(row.down) else int(row.down),
+                          distance=None if pd.isna(row.down) else int(row.ydstogo),
+                          desc=row.desc, timeouts=[]))
 
         # scores, and the end zone the play ended in, if any
         last_end = None
@@ -91,6 +101,9 @@ def game_data(df, teams):
             score(row.defteam, 2)
             last_end = target[row.defteam]
 
+        plays[-1]['score'] = dict(scores)    # after the play, conversions included
+        if row.timeout == 1:
+            plays[-1]['timeouts'].append(row.timeout_team)
         last = dict(point, y=float(row.Position), play_type=row.play_type, color=color)
 
     date = pd.Timestamp(df.game_date.iloc[0])
@@ -102,11 +115,10 @@ def game_data(df, teams):
                   for team in (home, away)},
         'date': date.strftime('%Y-%m-%d'),
         'segments': segments,
-        'markers': markers,
+        'plays': plays,
         'labels': labels,
         # quarters start between the last play of one and the first of the next
         'quarters': [{'quarter': q, 'play': 0 if q == 1 else first - 0.5, 'time': (q-1)*15*60}
                      for q, first in quarter_starts.items()],
-        'plays': play,
         'final_score': scores,
     }

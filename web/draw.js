@@ -17,7 +17,7 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
 export function drawGame(svg, game) {
   const {home, away, teams} = game;
   const target = {[home]: 100, [away]: 0};    // the end zone each team drives toward
-  const x = d3.scaleLinear([0, game.plays + 1], [MARGIN.left, WIDTH - MARGIN.right]);
+  const x = d3.scaleLinear([0, game.plays.length + 1], [MARGIN.left, WIDTH - MARGIN.right]);
   const y = d3.scaleLinear([-10, 110], [HEIGHT - MARGIN.bottom, MARGIN.top]);
 
   svg = d3.select(svg);
@@ -51,11 +51,11 @@ export function drawGame(svg, game) {
                    first_down: d3.symbol(d3.symbolCircle, 36),
                    play: d3.symbol(d3.symbolCircle, 6)};
   svg.append('g').selectAll('path')
-    .data(game.markers)
+    .data(game.plays)
     .join('path')
-    .attr('d', m => symbols[m.kind]())
-    .attr('transform', m => `translate(${x(m.play)},${y(m.y)})`)
-    .attr('fill', m => m.color);
+    .attr('d', p => symbols[p.kind]())
+    .attr('transform', p => `translate(${x(p.play)},${y(p.y)})`)
+    .attr('fill', p => p.color);
 
   svg.append('g').selectAll('text')
     .data(game.labels)

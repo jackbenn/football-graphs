@@ -26,13 +26,13 @@ def draw_game(ax, game, x_axis='play'):
     for segment in game['segments']:
         ax.plot(segment[x_axis], segment['y'], color=segment['color'], lw=1,
                 ls=STYLES.get(segment['play_type'], '-'))
-    for marker in game['markers']:
-        if marker['kind'] == 'kickoff':
-            ax.scatter([marker[x_axis]], [marker['y']], marker="*", s=200, color=marker['color'])
-        elif marker['kind'] == 'first_down':
-            ax.scatter([marker[x_axis]], [marker['y']], marker="o", color=marker['color'])
+    for play in game['plays']:
+        if play['kind'] == 'kickoff':
+            ax.scatter([play[x_axis]], [play['y']], marker="*", s=200, color=play['color'])
+        elif play['kind'] == 'first_down':
+            ax.scatter([play[x_axis]], [play['y']], marker="o", color=play['color'])
         else:
-            ax.scatter([marker[x_axis]], [marker['y']], marker=".", color=marker['color'], lw=0.5)
+            ax.scatter([play[x_axis]], [play['y']], marker=".", color=play['color'], lw=0.5)
     for label in game['labels']:
         team = label['team']
         ax.text(label[x_axis], 1.1*(target[team]-50)+50, label['score'], color=teams[team]['color'],
@@ -57,7 +57,7 @@ def draw_game(ax, game, x_axis='play'):
                 ax.axvline(x, color='k', lw=1.5 if q == 3 else 1)
         ax.set_xticks(list(starts.values()))
         ax.set_xticklabels([f'Q{q}' if q <= 4 else 'OT' for q in starts])
-        ax.set_xlim(0, game['plays'] + 1)
+        ax.set_xlim(0, len(game['plays']) + 1)
     for line in range(10, 100, 10):
         ax.axhline(line, color='k', lw=0.3)
     ax.axhline(0, color='k', lw=0.5)

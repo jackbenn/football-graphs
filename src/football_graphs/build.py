@@ -15,7 +15,7 @@ from .data import add_time_column, add_yards_column, download, load_season, load
 from .game import COLUMNS, game_data
 
 # the columns the index needs, besides those game_data reads
-INDEX_COLUMNS = ['game_id', 'play_id', 'season_type', 'week', 'home_score', 'away_score']
+INDEX_COLUMNS = ['play_id', 'season_type', 'week', 'home_score', 'away_score']
 
 # the playoff rounds, in order; nflverse numbers playoff weeks on from the
 # regular season, whose length has changed, so the round comes from the order
@@ -31,7 +31,8 @@ def current_season(today=None):
 def write_json(path, data):
     """Write data as gzipped JSON, with no timestamp, so the same data gives the same bytes"""
     with open(path, 'wb') as f, gzip.GzipFile(fileobj=f, mode='wb', mtime=0) as gz:
-        gz.write(json.dumps(data, separators=(',', ':')).encode())
+        # allow_nan=False: NaN isn't JSON, and browsers won't parse it
+        gz.write(json.dumps(data, separators=(',', ':'), allow_nan=False).encode())
 
 
 def build(season, data_dir='data', out='games', refresh=False):

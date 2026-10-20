@@ -3,6 +3,7 @@
 import urllib.request
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 BASE_URL = 'https://github.com/nflverse/nflverse-data/releases/download'
@@ -11,7 +12,7 @@ BASE_URL = 'https://github.com/nflverse/nflverse-data/releases/download'
 # chunks, a column whose first chunks are empty is otherwise taken for numbers
 TEXT_COLUMNS = {'game_id', 'season_type', 'game_date', 'home_team', 'away_team', 'posteam',
                 'defteam', 'play_type', 'td_team', 'field_goal_result', 'extra_point_result',
-                'two_point_conv_result'}
+                'two_point_conv_result', 'desc', 'timeout_team'}
 
 
 def download(year, data_dir='data', refresh=False):
@@ -45,8 +46,13 @@ def load_teams(data_dir='data'):
 
 
 def add_time_column(df):
-    """Add column for number of seconds into game"""
-    df['Time'] = (df.qtr-1)*60*15 + 60*15 - df.quarter_seconds_remaining
+    """Add column Time: seconds into the game. Quarters are 15 minutes, and so are
+    overtime periods in the playoffs, but regular-season overtime has been 10
+    minutes since 2017; a period that starts with 10:00 or less left is taken as
+    a 10-minute one."""
+    longest = df.groupby(['game_id', 'qtr']).quarter_seconds_remaining.transform('max')
+    length = np.where((df.qtr > 4) & (longest <= 10*60), 10*60, 15*60)
+    df['Time'] = (df.qtr-1)*60*15 + length - df.quarter_seconds_remaining
 
 
 def add_yards_column(df):
