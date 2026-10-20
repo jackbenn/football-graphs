@@ -140,7 +140,7 @@ accept gzip).
 
 ## [FBALL-14] Play details on click or hover
 
-- **Status:** active
+- **Status:** done
 - **Priority:** P3
 - **Size:** session
 - **Depends on:** FBALL-13
@@ -179,13 +179,13 @@ been seen; prefixing the quarter and clock from the play's own fields would
 cover both.
 
 ### Acceptance criteria
-- [ ] Hovering over any part of a play's column, in any panel, highlights
+- [x] Hovering over any part of a play's column, in any panel, highlights
   the column and shows the play's `desc` in a box above the graph, left of
   the legend
-- [ ] Clicking pins a play's details until a second click or Escape; while
+- [x] Clicking pins a play's details until a second click or Escape; while
   pinned, hovering shows nothing else
-- [ ] With a play pinned, ← and → pin the previous and next play
-- [ ] More space between the score, game and clock panels
+- [x] With a play pinned, ← and → pin the previous and next play
+- [x] More space between the score, game and clock panels
 
 ## [FBALL-18] Build the game files for past seasons
 
