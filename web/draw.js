@@ -1,15 +1,16 @@
 // Drawing a game from its game_data JSON with D3: the port of draw_game in
 // src/football_graphs/plot.py, by play number, with above it each team's score,
-// and below it a bar for each play of the clock time it took, colored by what
-// stopped the clock.
+// and below it each play's down, in the offense's color, over a bar hanging down
+// for the clock time it took, colored by what stopped the clock.
 
-const WIDTH = 1250, HEIGHT = 596;
+const WIDTH = 1250, HEIGHT = 612;
 const MARGIN = {right: 34, left: 34};
 // the panels, top to bottom, in pixels, with the game graph's legend between the
-// first two
+// first two and the downs between the last two
 const SCORE = {top: 44, bottom: 134};
 const GAME = {top: 158, bottom: 486};
-const CLOCK = {top: 496, bottom: 576, most: 60};    // and the clock panel's top in seconds
+const DOWNS = 500;
+const CLOCK = {top: 512, bottom: 592, most: 60};    // and the clock panel's bottom in seconds
 
 // dash pattern for the play that starts at each point, as in plot.py's STYLES
 const SOLID = null, DOTTED = '1.5 2.5', DASHED = '6 3', DASHDOT = '8 3 1.5 3';
@@ -103,12 +104,10 @@ export function drawGame(svg, game) {
 
   // yards up both sides, with no ticks at the backs of the end zones; the
   // quarters are along the bottom of the clock panel
-  const yards = axis => axis(y)
+  bothSides(svg, x, axis => axis(y)
     .tickSizeOuter(0)
     .tickValues(d3.range(0, 101, 10))
-    .tickFormat(d => 50 - Math.abs(d - 50));
-  svg.append('g').attr('transform', `translate(${x.range()[0]},0)`).call(yards(d3.axisLeft));
-  svg.append('g').attr('transform', `translate(${x.range()[1]},0)`).call(yards(d3.axisRight));
+    .tickFormat(d => 50 - Math.abs(d - 50)));
   svg.append('rect')
     .attr('x', x.range()[0]).attr('y', y.range()[1])
     .attr('width', x.range()[1] - x.range()[0]).attr('height', y.range()[0] - y.range()[1])
@@ -171,19 +170,18 @@ function drawScore(svg, game, x) {
                              [x.domain()[1], game.final_score[team]]]))
     .attr('fill', 'none').attr('stroke', team => teams[team].color).attr('stroke-width', 2);
 
-  svg.append('g')
-    .attr('transform', `translate(${x.range()[0]},0)`)
-    .call(d3.axisLeft(y).tickSizeOuter(0).ticks(3));
+  bothSides(svg, x, axis => axis(y).tickSizeOuter(0).ticks(3));
   svg.append('rect')
     .attr('x', x.range()[0]).attr('y', SCORE.top)
     .attr('width', x.range()[1] - x.range()[0]).attr('height', SCORE.bottom - SCORE.top)
     .attr('fill', 'none').attr('stroke', 'black').attr('stroke-width', 0.8);
 }
 
-// a bar for each play of the clock time it took, up to CLOCK.most seconds, in
-// the color of what stopped the clock, with the quarters marked as above
+// a bar for each play of the clock time it took, hanging down to at most
+// CLOCK.most seconds, in the color of what stopped the clock, with the quarters
+// marked as above
 function drawClock(svg, game, x) {
-  const y = d3.scaleLinear([0, CLOCK.most], [CLOCK.bottom, CLOCK.top]).clamp(true);
+  const y = d3.scaleLinear([0, CLOCK.most], [CLOCK.top, CLOCK.bottom]).clamp(true);
   const width = Math.max(1, x(1) - x(0) - 1.5);
 
   svg.append('g').selectAll('line')
@@ -199,23 +197,30 @@ function drawClock(svg, game, x) {
     .attr('y1', CLOCK.bottom).attr('y2', CLOCK.top)
     .attr('stroke', 'black').attr('stroke-width', q => q.quarter === 3 ? 1.5 : 1);
 
+  // each play's down over its bar, in the offense's color; kicks and tries have none
+  svg.append('g').selectAll('text')
+    .data(game.plays.filter(p => p.down !== null))
+    .join('text')
+    .attr('x', p => x(p.play)).attr('y', DOWNS)
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+    .attr('fill', p => p.color).attr('class', 'down')
+    .text(p => p.down);
+
   const clock = seconds => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
   svg.append('g').selectAll('rect')
     .data(game.plays.filter(p => p.duration !== null))
     .join('rect')
     .attr('x', p => x(p.play) - width / 2).attr('width', width)
-    .attr('y', p => y(p.duration)).attr('height', p => CLOCK.bottom - y(p.duration))
+    .attr('y', CLOCK.top).attr('height', p => y(p.duration) - CLOCK.top)
     .attr('fill', p => STOP[p.stop].color)
     .append('title')
     .text(p => `${p.quarter <= 4 ? `Q${p.quarter}` : 'OT'} ${clock(p.clock)}: ` +
                `${p.duration} seconds, ${STOP[p.stop].label}`);
 
-  svg.append('g')
-    .attr('transform', `translate(${x.range()[0]},0)`)
-    .call(d3.axisLeft(y)
-      .tickSizeOuter(0)
-      .ticks(3)
-      .tickFormat(d => d === 0 ? '' : clock(d)));
+  bothSides(svg, x, axis => axis(y)
+    .tickSizeOuter(0)
+    .ticks(3)
+    .tickFormat(d => d === 0 ? '' : clock(d)));
   // the quarters along the bottom, for both panels, the first at the frame
   const quarters = game.quarters;
   svg.append('g')
@@ -230,6 +235,12 @@ function drawClock(svg, game, x) {
     .attr('x', x.range()[0]).attr('y', CLOCK.top)
     .attr('width', x.range()[1] - x.range()[0]).attr('height', CLOCK.bottom - CLOCK.top)
     .attr('fill', 'none').attr('stroke', 'black').attr('stroke-width', 0.8);
+}
+
+// a y axis on both sides of a panel: make(d3.axisLeft), then make(d3.axisRight)
+function bothSides(svg, x, make) {
+  svg.append('g').attr('transform', `translate(${x.range()[0]},0)`).call(make(d3.axisLeft));
+  svg.append('g').attr('transform', `translate(${x.range()[1]},0)`).call(make(d3.axisRight));
 }
 
 // the legend for the clock bars, into an HTML element: what stopped the clock,

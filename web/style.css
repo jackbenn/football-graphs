@@ -25,6 +25,11 @@ svg.game .score, svg.game .team {
   font-weight: bold;
 }
 
+svg.game .down {
+  font-size: 10px;
+  font-weight: bold;
+}
+
 svg.game .title {
   font-size: 16px;
 }
