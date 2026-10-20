@@ -30,12 +30,13 @@ page (FBALL-13), which shares the play-number x axis.
 
 ## [FBALL-7] Bar graph of the clock time each play takes
 
-- **Status:** active
+- **Status:** done
 - **Priority:** P3
 - **Size:** session
 - **Depends on:** none
 - **Tags:** rendering
 - **Related:** FBALL-6
+- **Commits:** 07176a9, e2b54c8
 
 Add another graph below the game plot, sharing its x axis, with a bar for
 each play showing how much clock time it took. Color the bars, each in a
@@ -82,16 +83,22 @@ last play of one), and `stop`, the first that applies of: `quarter_end`,
   tested on hand-built games and checked across the 2018 season
 - [x] The page draws a bar per play below the game graph, sharing its x
   axis, colored by `stop`, with a legend
-- [ ] The notebook's matplotlib plot gets the same panel, or it is decided
+- [x] The notebook's matplotlib plot gets the same panel, or it is decided
   that it stays D3-only
+
+### Notes
+- 2026-10-19: decided D3-only; the matplotlib plot is deprecated (a258949).
+  The legend became a list beside the game list, in groups of like reasons
+  with like colors, and "clock running" became "clock kept running".
 
 ## [FBALL-8] Graphical cleanup of the game plot
 
-- **Status:** idea
+- **Status:** done
 - **Priority:** P2
 - **Size:** session
 - **Depends on:** none
 - **Tags:** rendering
+- **Commits:** 43611e2
 
 A batch of small fixes to `plot_game`:
 - The first kickoff's star is clipped at the left edge.
@@ -110,9 +117,17 @@ A batch of small fixes to `plot_game`:
   the opening kickoff of 2018102500; `kickoff_attempt` marks them.
 
 ### Acceptance criteria
-- [ ] Each fix above is visible on the 2018090902 game and on one game whose
+- [x] Each fix above is visible on the 2018090902 game and on one game whose
   first play isn't at x=0
-- [ ] Every 2018 game still ends on its real final score
+- [x] Every 2018 game still ends on its real final score
+
+### Notes
+- 2026-10-19: done on the D3 page instead, since `plot_game` is now
+  deprecated; the two data fixes (the touchdown label's place, the
+  called-back kickoff) are in `game_data`, so the deprecated plot gets them
+  too. Checked on 2018090902 (2018_01_CIN_IND) and 2018102500
+  (2018_08_MIA_HOU). Every `no_play` in 2018 is a penalty (57 are
+  offsetting, with `penalty` NaN), so the legend says just "penalty".
 
 ## [FBALL-12] Download the data and build the game files on a schedule
 
