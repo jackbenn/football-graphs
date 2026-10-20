@@ -11,7 +11,7 @@ COLUMNS = ['game_id', 'home_team', 'away_team', 'game_date', 'qtr', 'quarter_sec
            'field_goal_result', 'extra_point_result', 'two_point_conv_result', 'safety',
            'posteam_score', 'posteam_score_post', 'defensive_two_point_conv', 'ydstogo', 'desc',
            'timeout', 'timeout_team', 'incomplete_pass', 'out_of_bounds', 'penalty', 'interception',
-           'fumble_lost', 'fourth_down_failed']
+           'fumble_lost', 'fourth_down_failed', 'kickoff_attempt']
 
 
 def late(quarter, clock):
@@ -38,7 +38,7 @@ def clock_stop(row):
         return 'kick'
     if row.incomplete_pass == 1:    # spikes too
         return 'incomplete'
-    if row.penalty == 1:
+    if row.penalty == 1 or row.play_type == 'no_play':    # offsetting penalties have no `penalty`
         return 'penalty'
     if row.out_of_bounds == 1 and late(row.qtr, row.quarter_seconds_remaining):
         return 'out_of_bounds'
@@ -64,6 +64,7 @@ def game_data(df, teams):
     quarter_starts = {}    # quarter -> play number of its first play
     last = None        # the point and color of the previous play, and its type
     last_end = None    # the end zone the previous play ended in, if it did
+    touchdown = None   # the label of a touchdown whose try is still to come
 
     def score(team, points, conversion=False):
         scores[team] += points
@@ -78,8 +79,10 @@ def game_data(df, teams):
             plays[-1]['timeouts'].append(row.timeout_team)
         if pd.isna(row.play_type) or pd.isna(row.posteam):    # not plays; timeouts
             continue
-        # posteam is the receiving team on kickoffs; this wants the kicking team
-        if row.play_type == 'kickoff':
+        # posteam is the receiving team on kickoffs, even one called back by a
+        # penalty (a no_play); this wants the kicking team
+        kickoff = row.kickoff_attempt == 1
+        if kickoff:
             offense, defense = row.defteam, row.posteam
         else:
             offense, defense = row.posteam, row.defteam
@@ -90,13 +93,13 @@ def game_data(df, teams):
 
         # the line for the previous play: into the end zone it ended in, or else
         # to this play's spot, except that a kickoff starts a new possession
-        if last is not None and (last_end is not None or row.play_type != 'kickoff'):
+        if last is not None and (last_end is not None or not kickoff):
             end = float(row.Position) if last_end is None else last_end
             segments.append({'play': [last['play'], play], 'time': [last['time'], point['time']],
                              'y': [last['y'], end], 'play_type': last['play_type'],
                              'color': last['color']})
 
-        if row.play_type == 'kickoff':
+        if kickoff:
             kind = 'kickoff'
         elif row.down == 1:
             kind = 'first_down'
@@ -109,11 +112,22 @@ def game_data(df, teams):
                           distance=None if pd.isna(row.down) else int(row.ydstogo),
                           desc=row.desc, timeouts=[], stop=clock_stop(row)))
 
+        # a touchdown's label goes between it and its try; two-point tries are
+        # recorded as passes or runs, and a penalty can come before the try
+        if row.play_type == 'extra_point' or pd.notna(row.two_point_conv_result):
+            if touchdown is not None:
+                touchdown['play'] = (touchdown['play'] + play) / 2
+                touchdown['time'] = (touchdown['time'] + point['time']) / 2
+            touchdown = None
+        elif row.play_type != 'no_play':
+            touchdown = None
+
         # scores, and the end zone the play ended in, if any
         last_end = None
         if row.touchdown == 1:
             # td_team, since the defense can score too (e.g. a fumble return)
             score(row.td_team, 6)
+            touchdown = labels[-1]
             last_end = target[row.td_team]
         if row.field_goal_result == 'made':
             score(offense, 3)

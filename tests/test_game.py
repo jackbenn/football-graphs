@@ -24,7 +24,7 @@ def other(team):
 def kickoff(kicking, yardline_100=35, **columns):
     """A kickoff from the kicking team's own 35; posteam is the receiving team"""
     return dict(play_type='kickoff', posteam=other(kicking), defteam=kicking,
-                yardline_100=yardline_100, **columns)
+                yardline_100=yardline_100, kickoff_attempt=1, **columns)
 
 
 def snap(play_type, offense, yardline_100, down=1, **columns):
@@ -41,7 +41,8 @@ def game(*plays):
                     two_point_conv_result=np.nan, safety=0, posteam_score=0,
                     posteam_score_post=0, defensive_two_point_conv=0, desc='a play',
                     timeout=0, timeout_team=np.nan, incomplete_pass=0, out_of_bounds=0,
-                    penalty=0, interception=0, fumble_lost=0, fourth_down_failed=0)
+                    penalty=0, interception=0, fumble_lost=0, fourth_down_failed=0,
+                    kickoff_attempt=0)
     df = pd.DataFrame([{**ordinary, 'quarter_seconds_remaining': 900 - 30*i, **play}
                        for i, play in enumerate(plays)])
     add_time_column(df)
@@ -68,7 +69,7 @@ def test_defensive_touchdown():
                 snap('extra_point', HOME, 15, down=np.nan, extra_point_result='good'),
                 kickoff(HOME))
     assert data['final_score'] == {HOME: 7, AWAY: 0}
-    assert labels(data) == [(3, HOME, 7)]
+    assert labels(data) == [(3.5, HOME, 7)]
     interception = segment_from(data, 3)
     assert interception['y'][1] == 100
     assert interception['color'] == COLORS[AWAY]
@@ -106,18 +107,20 @@ def test_defensive_two_point_return():
                      defensive_two_point_conv=1),
                 kickoff(AWAY))
     assert data['final_score'] == {HOME: 2, AWAY: 6}
-    assert labels(data) == [(2, AWAY, 6), (3, HOME, 2)]
+    assert labels(data) == [(2.5, AWAY, 6), (3, HOME, 2)]
     assert segment_from(data, 3)['y'][1] == 100
 
 
 def test_first_play_not_a_kickoff():
     """As in 2018102500: the opening kickoff is called back by a penalty, so the
-    first play is a no_play, with the receiving team as posteam, and the kickoff
-    after it starts a new line"""
-    data = game(dict(kickoff(HOME), play_type='no_play'),
+    first play is a no_play, with the receiving team as posteam; it is still a
+    kickoff by the kicking team, and the kickoff after it starts a new line"""
+    data = game(dict(kickoff(HOME), play_type='no_play', penalty=1),
                 kickoff(HOME, yardline_100=40),
                 snap('pass', AWAY, 75))
     assert [play['play'] for play in data['plays']] == [1, 2, 3]
+    assert [play['kind'] for play in data['plays']] == ['kickoff', 'kickoff', 'first_down']
+    assert data['plays'][0]['offense'] == HOME and data['plays'][0]['color'] == COLORS[HOME]
     assert [segment['play'] for segment in data['segments']] == [[2, 3]]
     assert data['quarters'] == [{'quarter': 1, 'play': 0, 'time': 0}]
     assert data['final_score'] == {HOME: 0, AWAY: 0}
@@ -211,3 +214,15 @@ def test_clock_runs_backwards():
                 snap('run', AWAY, 70, qtr=1, quarter_seconds_remaining=10),
                 snap('run', AWAY, 65, qtr=2, quarter_seconds_remaining=370))
     assert stops(data)[0] == (None, 'running')
+
+
+def test_touchdown_label():
+    """A touchdown's label goes between it and its try, even with a penalty
+    between them, and stays at the touchdown when there is no try"""
+    data = game(kickoff(HOME),
+                snap('pass', AWAY, 10, touchdown=1, td_team=AWAY),
+                snap('no_play', AWAY, 15, down=np.nan, penalty=1),
+                snap('extra_point', AWAY, 20, down=np.nan, extra_point_result='failed'),
+                kickoff(AWAY),
+                snap('run', HOME, 5, touchdown=1, td_team=HOME))    # an overtime walk-off
+    assert labels(data) == [(3, AWAY, 6), (6, HOME, 6)]
