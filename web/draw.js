@@ -4,7 +4,7 @@
 // for the clock time it took, colored by what stopped the clock.
 
 const WIDTH = 1250, HEIGHT = 612;
-const MARGIN = {right: 34, left: 34};
+const MARGIN = {right: 34, left: 52};    // and web/style.css indents to MARGIN.left
 // the panels, top to bottom, in pixels, with the game graph's legend between the
 // first two and the downs between the last two
 const SCORE = {top: 44, bottom: 134};
@@ -17,7 +17,15 @@ const SOLID = null, DOTTED = '1.5 2.5', DASHED = '6 3', DASHDOT = '8 3 1.5 3';
 const STYLES = {run: SOLID, qb_kneel: SOLID, pass: DOTTED, qb_spike: DOTTED,
                 kickoff: DASHED, punt: DASHED, field_goal: DASHED, extra_point: DASHED,
                 no_play: DASHDOT};
-const LEGEND = [['run', SOLID], ['pass', DOTTED], ['kick', DASHED], ['penalty', DASHDOT]];
+
+// the markers for plays, and the game graph's legend: the markers, then the line styles
+const SYMBOLS = {kickoff: d3.symbol(d3.symbolStar, 110),
+                 first_down: d3.symbol(d3.symbolCircle, 36),
+                 play: d3.symbol(d3.symbolCircle, 6)};
+const LEGEND = [{label: 'kickoff', symbol: SYMBOLS.kickoff},
+                {label: '1st down', symbol: SYMBOLS.first_down},
+                {label: 'run', dash: SOLID}, {label: 'pass', dash: DOTTED},
+                {label: 'kick', dash: DASHED}, {label: 'penalty', dash: DASHDOT}];
 
 // what stopped the clock after each play, in groups of like reasons with like
 // colors, as the legend shows them: game_data's reasons, with the kicks and
@@ -74,13 +82,10 @@ export function drawGame(svg, game) {
     .attr('stroke', s => s.color).attr('stroke-width', 1)
     .attr('stroke-dasharray', s => STYLES[s.play_type] ?? SOLID);
 
-  const symbols = {kickoff: d3.symbol(d3.symbolStar, 110),
-                   first_down: d3.symbol(d3.symbolCircle, 36),
-                   play: d3.symbol(d3.symbolCircle, 6)};
   svg.append('g').selectAll('path')
     .data(game.plays)
     .join('path')
-    .attr('d', p => symbols[p.kind]())
+    .attr('d', p => SYMBOLS[p.kind]())
     .attr('transform', p => `translate(${x(p.play)},${y(p.y)})`)
     .attr('fill', p => p.color);
 
@@ -108,6 +113,7 @@ export function drawGame(svg, game) {
     .tickSizeOuter(0)
     .tickValues(d3.range(0, 101, 10))
     .tickFormat(d => 50 - Math.abs(d - 50)));
+  axisTitle(svg, x, GAME, 'ball position');
   svg.append('rect')
     .attr('x', x.range()[0]).attr('y', y.range()[1])
     .attr('width', x.range()[1] - x.range()[0]).attr('height', y.range()[0] - y.range()[1])
@@ -125,15 +131,21 @@ export function drawGame(svg, game) {
     .data(LEGEND.slice().reverse())
     .join('g');
   let right = 0;
-  legend.each(function ([label, dash]) {
+  legend.each(function ({label, symbol, dash}) {
     const item = d3.select(this);
     const text = item.append('text').attr('class', 'legend').attr('text-anchor', 'end')
       .attr('dominant-baseline', 'central').attr('x', right).text(label);
     const width = text.node().getComputedTextLength();
-    item.append('line')
-      .attr('x1', right - width - 30).attr('x2', right - width - 6)
-      .attr('stroke', 'black').attr('stroke-width', 1).attr('stroke-dasharray', dash);
-    right -= width + 46;
+    if (symbol) {
+      item.append('path').attr('d', symbol())
+        .attr('transform', `translate(${right - width - 14},0)`);
+      right -= width + 38;
+    } else {
+      item.append('line')
+        .attr('x1', right - width - 30).attr('x2', right - width - 6)
+        .attr('stroke', 'black').attr('stroke-width', 1).attr('stroke-dasharray', dash);
+      right -= width + 46;
+    }
   });
 
   drawScore(svg, game, x);
@@ -171,6 +183,7 @@ function drawScore(svg, game, x) {
     .attr('fill', 'none').attr('stroke', team => teams[team].color).attr('stroke-width', 2);
 
   bothSides(svg, x, axis => axis(y).tickSizeOuter(0).ticks(3));
+  axisTitle(svg, x, SCORE, 'score');
   svg.append('rect')
     .attr('x', x.range()[0]).attr('y', SCORE.top)
     .attr('width', x.range()[1] - x.range()[0]).attr('height', SCORE.bottom - SCORE.top)
@@ -205,6 +218,10 @@ function drawClock(svg, game, x) {
     .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
     .attr('fill', p => p.color).attr('class', 'down')
     .text(p => p.down);
+  svg.append('text')
+    .attr('x', x.range()[0] - 6).attr('y', DOWNS)
+    .attr('text-anchor', 'end').attr('dominant-baseline', 'central').attr('class', 'axis-title')
+    .text('down');
 
   const clock = seconds => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
   svg.append('g').selectAll('rect')
@@ -221,6 +238,7 @@ function drawClock(svg, game, x) {
     .tickSizeOuter(0)
     .ticks(3)
     .tickFormat(d => d === 0 ? '' : clock(d)));
+  axisTitle(svg, x, CLOCK, 'play duration');
   // the quarters along the bottom, for both panels, the first at the frame
   const quarters = game.quarters;
   svg.append('g')
@@ -241,6 +259,15 @@ function drawClock(svg, game, x) {
 function bothSides(svg, x, make) {
   svg.append('g').attr('transform', `translate(${x.range()[0]},0)`).call(make(d3.axisLeft));
   svg.append('g').attr('transform', `translate(${x.range()[1]},0)`).call(make(d3.axisRight));
+}
+
+// a panel's name, up the left side, outside its axis
+function axisTitle(svg, x, panel, text) {
+  const middle = (panel.top + panel.bottom) / 2;
+  svg.append('text')
+    .attr('transform', `translate(${x.range()[0] - 40},${middle}) rotate(-90)`)
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central').attr('class', 'axis-title')
+    .text(text);
 }
 
 // the legend for the clock bars, into an HTML element: what stopped the clock,

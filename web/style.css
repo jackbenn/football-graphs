@@ -26,8 +26,12 @@ svg.game .score, svg.game .team {
 }
 
 svg.game .down {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: bold;
+}
+
+svg.game .axis-title {
+  font-size: 12px;
 }
 
 svg.game .title {
@@ -40,7 +44,7 @@ svg.game .title {
 
 /* indented to the graph's left axis: MARGIN.left of the svg's WIDTH, in draw.js */
 .below {
-  padding-left: calc(100% * 34 / 1250);
+  padding-left: calc(100% * 52 / 1250);
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
