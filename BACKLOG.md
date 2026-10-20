@@ -70,12 +70,12 @@ build should be one command that FBALL-18 can run for any season.
 
 ## [FBALL-13] Game page on the website
 
-- **Status:** active
+- **Status:** done
 - **Priority:** P3
 - **Size:** multi
 - **Depends on:** FBALL-9, FBALL-11, FBALL-12
 - **Tags:** web
-- **Commits:** b7f6049
+- **Commits:** b7f6049, ce76b97
 
 A page at bennetto.com/football where a visitor selects a game through some
 controls and sees its graph, drawn in the browser with D3 from the game's
@@ -109,6 +109,9 @@ OR, with no head-to-head toggle for now; the only clear alternative is
 separate "team 1" and "team 2" filters (without home and away). The phone
 layout is parked.
 
+Changed 2026-10-20: the team filter takes one team, not several, and the
+year filter names each season by the years it spans (2026–27).
+
 The page must credit nflverse, link to CC BY 4.0, and say the data was
 changed (FBALL-17). Use the team names and colors, not the logos.
 
@@ -124,9 +127,16 @@ accept gzip).
   credits nflverse with a link to CC BY 4.0
 - [x] The page has the filters and paged list described above, and always
   shows a game: `?game=<game_id>`, or else the most recent
-- [ ] bennetto.com/football serves the page and the game files, gzipped,
+- [x] bennetto.com/football serves the page and the game files, gzipped,
   with the host fetching each season's tarball daily, and a row in
   `DEPLOY.md`; deployed through `publish-site`
+
+### Notes
+- 2026-10-20: deployed. The infra side is bennetto-infra 84e6f1a (route,
+  mounts, `fetch-football.sh`, `DEPLOY.md`) and 99704be (a `deploy.sh` fix).
+  The repo moved into `bennetto-infra` as a submodule, and its branch from
+  `master` to `main`. The first files published were built before 07176a9 and
+  lacked the clock fields; rebuilt the same day.
 
 ## [FBALL-14] Play details on click or hover
 
