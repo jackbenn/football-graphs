@@ -140,12 +140,13 @@ accept gzip).
 
 ## [FBALL-14] Play details on click or hover
 
-- **Status:** idea
+- **Status:** active
 - **Priority:** P3
 - **Size:** session
 - **Depends on:** FBALL-13
 - **Tags:** web
 - **Related:** FBALL-17
+- **Commits:** 5c59792
 
 Clicking, or perhaps mousing over, a play on the graph shows its details:
 at least the description (`desc`), down and distance, and the clock. Those
@@ -159,6 +160,32 @@ distance, clock, yards, play type).
 
 Since 7442e2c each play in `game_data` has its description, down and
 distance, quarter and clock, so this is only the D3 side.
+
+Decided 2026-10-20:
+- Hovering over a play highlights its column, across all three panels, and
+  shows its details; clicking pins them, and clicking again or Escape
+  unpins. Each play's column is the full height of the graph, since many
+  plays have no marker.
+- The details go in a box above the graph, on the left, beside the legend.
+  It shows only `desc`.
+- With a play pinned, the left and right arrow keys step to the previous
+  and next play.
+- A little more space between the three panels.
+
+`desc` starts with the clock on about 90% of plays, but not on kickoffs,
+extra points or two-point tries, and never says the quarter. Decided
+2026-10-20 to show the plain `desc` anyway, to keep it minimal until it's
+been seen; prefixing the quarter and clock from the play's own fields would
+cover both.
+
+### Acceptance criteria
+- [ ] Hovering over any part of a play's column, in any panel, highlights
+  the column and shows the play's `desc` in a box above the graph, left of
+  the legend
+- [ ] Clicking pins a play's details until a second click or Escape; while
+  pinned, hovering shows nothing else
+- [ ] With a play pinned, ← and → pin the previous and next play
+- [ ] More space between the score, game and clock panels
 
 ## [FBALL-18] Build the game files for past seasons
 
