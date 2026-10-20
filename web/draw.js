@@ -2,9 +2,9 @@
 // src/football_graphs/plot.py, by play number, and below it a bar for each play
 // of the clock time it took, colored by what stopped the clock.
 
-const WIDTH = 1250, GAME_HEIGHT = 400, HEIGHT = 500;
+const WIDTH = 1250, GAME_HEIGHT = 400, HEIGHT = 482;
 const MARGIN = {top: 44, right: 34, bottom: 28, left: 34};
-const CLOCK = {top: 412, bottom: 492, most: 60};    // the clock panel, in pixels, and its top in seconds
+const CLOCK = {top: 382, bottom: 462, most: 60};    // the clock panel, in pixels, and its top in seconds
 
 // dash pattern for the play that starts at each point, as in plot.py's STYLES
 const SOLID = null, DOTTED = '1.5 2.5', DASHED = '6 3', DASHDOT = '8 3 1.5 3';
@@ -81,8 +81,10 @@ export function drawGame(svg, game) {
   svg.append('g').selectAll('text')
     .data(game.labels)
     .join('text')
-    .attr('x', l => x(l.play)).attr('y', l => y(1.1 * (target[l.team] - 50) + 50))
-    .attr('fill', l => teams[l.team].color).attr('class', 'score').attr('text-anchor', 'middle')
+    // the same distance into either end zone
+    .attr('x', l => x(l.play)).attr('y', l => target[l.team] === 100 ? y(100) - 9 : y(0) + 9)
+    .attr('fill', l => teams[l.team].color).attr('class', 'score')
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
     .text(l => l.score);
 
   // each team's name in the end zone it defends
@@ -94,15 +96,8 @@ export function drawGame(svg, game) {
     .attr('fill', ([team]) => teams[team].color).attr('class', 'team')
     .text(([team]) => teams[team].nick);
 
-  // axes: quarters along the bottom, the first at the frame, and yards up both
-  // sides, with no ticks at the backs of the end zones
-  const quarters = game.quarters;
-  svg.append('g')
-    .attr('transform', `translate(0,${y.range()[0]})`)
-    .call(d3.axisBottom(x)
-      .tickSizeOuter(0)
-      .tickValues(quarters.map(q => q.quarter === 1 ? x.domain()[0] : q.play))
-      .tickFormat((_, i) => quarters[i].quarter <= 4 ? `Q${quarters[i].quarter}` : 'OT'));
+  // yards up both sides, with no ticks at the backs of the end zones; the
+  // quarters are along the bottom of the clock panel
   const yards = axis => axis(y)
     .tickSizeOuter(0)
     .tickValues(d3.range(0, 101, 10))
@@ -176,6 +171,16 @@ function drawClock(svg, game, x) {
       .tickSizeOuter(0)
       .ticks(3)
       .tickFormat(d => d === 0 ? '' : clock(d)));
+  // the quarters along the bottom, for both panels, the first at the frame
+  const quarters = game.quarters;
+  svg.append('g')
+    .attr('transform', `translate(0,${CLOCK.bottom})`)
+    .call(d3.axisBottom(x)
+      .tickSizeOuter(0)
+      .tickSize(4)
+      .tickPadding(2)
+      .tickValues(quarters.map(q => q.quarter === 1 ? x.domain()[0] : q.play))
+      .tickFormat((_, i) => quarters[i].quarter <= 4 ? `Q${quarters[i].quarter}` : 'OT'));
   svg.append('rect')
     .attr('x', x.range()[0]).attr('y', CLOCK.top)
     .attr('width', x.range()[1] - x.range()[0]).attr('height', CLOCK.bottom - CLOCK.top)

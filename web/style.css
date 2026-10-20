@@ -33,7 +33,9 @@ svg.game .title {
   display: none;
 }
 
+/* indented to the graph's left axis: MARGIN.left of the svg's WIDTH, in draw.js */
 .below {
+  padding-left: calc(100% * 34 / 1250);
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
