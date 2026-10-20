@@ -6,8 +6,9 @@ play number or the game clock: a line for each play, styled by the kind of
 play, in the two teams' colors, with the score marked at each score.
 
 The code is a Python package, `football_graphs` in `src/`: `data` downloads
-and loads the play-by-play, `colors` picks the teams' colors, and `plot`
-draws a game. A [marimo](https://marimo.io) notebook, `EDA.py`, uses it to
+and loads the play-by-play, `colors` picks the teams' colors, `game` turns a
+game's plays into plain data (line segments, markers, score labels, quarter
+starts) that can be saved as JSON, and `plot` draws that with matplotlib. A [marimo](https://marimo.io) notebook, `EDA.py`, uses it to
 explore the 2018 season and plot one game. The plan, including a page at
 bennetto.com/football, is in [`BACKLOG.md`](BACKLOG.md).
 
