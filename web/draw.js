@@ -1,10 +1,15 @@
 // Drawing a game from its game_data JSON with D3: the port of draw_game in
-// src/football_graphs/plot.py, by play number, and below it a bar for each play
-// of the clock time it took, colored by what stopped the clock.
+// src/football_graphs/plot.py, by play number, with above it each team's score,
+// and below it a bar for each play of the clock time it took, colored by what
+// stopped the clock.
 
-const WIDTH = 1250, GAME_HEIGHT = 400, HEIGHT = 482;
-const MARGIN = {top: 44, right: 34, bottom: 28, left: 34};
-const CLOCK = {top: 382, bottom: 462, most: 60};    // the clock panel, in pixels, and its top in seconds
+const WIDTH = 1250, HEIGHT = 596;
+const MARGIN = {right: 34, left: 34};
+// the panels, top to bottom, in pixels, with the game graph's legend between the
+// first two
+const SCORE = {top: 44, bottom: 134};
+const GAME = {top: 158, bottom: 486};
+const CLOCK = {top: 496, bottom: 576, most: 60};    // and the clock panel's top in seconds
 
 // dash pattern for the play that starts at each point, as in plot.py's STYLES
 const SOLID = null, DOTTED = '1.5 2.5', DASHED = '6 3', DASHDOT = '8 3 1.5 3';
@@ -38,7 +43,7 @@ export function drawGame(svg, game) {
   const target = {[home]: 100, [away]: 0};    // the end zone each team drives toward
   // a play's room either side of the first and last, so their markers clear the frame
   const x = d3.scaleLinear([-1, game.plays.length + 2], [MARGIN.left, WIDTH - MARGIN.right]);
-  const y = d3.scaleLinear([-10, 110], [GAME_HEIGHT - MARGIN.bottom, MARGIN.top]);
+  const y = d3.scaleLinear([-10, 110], [GAME.bottom, GAME.top]);
 
   svg = d3.select(svg);
   svg.selectAll('*').remove();
@@ -111,12 +116,12 @@ export function drawGame(svg, game) {
 
   const [year, month, day] = game.date.split('-').map(Number);
   svg.append('text')
-    .attr('x', (x.range()[0] + x.range()[1]) / 2).attr('y', 16)
+    .attr('x', (x.range()[0] + x.range()[1]) / 2).attr('y', 23)
     .attr('text-anchor', 'middle').attr('class', 'title')
     .text(`${teams[away].name} at ${teams[home].name}, ${MONTHS[month - 1]} ${day}, ${year}`);
 
   const legend = svg.append('g')
-    .attr('transform', `translate(${x.range()[1]},${MARGIN.top - 8})`)
+    .attr('transform', `translate(${x.range()[1]},${GAME.top - 12})`)
     .selectAll('g')
     .data(LEGEND.slice().reverse())
     .join('g');
@@ -132,7 +137,47 @@ export function drawGame(svg, game) {
     right -= width + 46;
   });
 
+  drawScore(svg, game, x);
   drawClock(svg, game, x);
+}
+
+// each team's score, a step after each play that scores, so that a touchdown and
+// its extra point are two steps; the quarters marked as below, but not labeled
+function drawScore(svg, game, x) {
+  const {home, away, teams} = game;
+  const most = d3.max([home, away], team => game.final_score[team]);
+  const y = d3.scaleLinear([0, Math.max(most, 7)], [SCORE.bottom, SCORE.top]).nice(3);
+
+  svg.append('g').selectAll('line')
+    .data(y.ticks(3).filter(d => d > 0))
+    .join('line')
+    .attr('x1', x.range()[0]).attr('x2', x.range()[1])
+    .attr('y1', y).attr('y2', y)
+    .attr('stroke', '#ddd').attr('shape-rendering', 'crispEdges');
+  svg.append('g').selectAll('line')
+    .data(game.quarters.filter(q => q.quarter > 1))
+    .join('line')
+    .attr('x1', q => x(q.play)).attr('x2', q => x(q.play))
+    .attr('y1', SCORE.bottom).attr('y2', SCORE.top)
+    .attr('stroke', 'black').attr('stroke-width', q => q.quarter === 3 ? 1.5 : 1);
+
+  // from 0-0 at the left edge to the final score at the right
+  const line = d3.line(([play]) => x(play), ([, score]) => y(score)).curve(d3.curveStepAfter);
+  svg.append('g').selectAll('path')
+    .data([home, away])
+    .join('path')
+    .attr('d', team => line([[x.domain()[0], 0],
+                             ...game.plays.map(p => [p.play, p.score[team]]),
+                             [x.domain()[1], game.final_score[team]]]))
+    .attr('fill', 'none').attr('stroke', team => teams[team].color).attr('stroke-width', 2);
+
+  svg.append('g')
+    .attr('transform', `translate(${x.range()[0]},0)`)
+    .call(d3.axisLeft(y).tickSizeOuter(0).ticks(3));
+  svg.append('rect')
+    .attr('x', x.range()[0]).attr('y', SCORE.top)
+    .attr('width', x.range()[1] - x.range()[0]).attr('height', SCORE.bottom - SCORE.top)
+    .attr('fill', 'none').attr('stroke', 'black').attr('stroke-width', 0.8);
 }
 
 // a bar for each play of the clock time it took, up to CLOCK.most seconds, in
