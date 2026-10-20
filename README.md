@@ -5,8 +5,10 @@ on the field (one end zone at the bottom, the other at the top) against the
 play number or the game clock: a line for each play, styled by the kind of
 play, in the two teams' colors, with the score marked at each score.
 
-So far it is one [marimo](https://marimo.io) notebook, `EDA.py`, exploring
-the 2018 season and plotting one game. The plan, including a page at
+The code is a Python package, `football_graphs` in `src/`: `data` downloads
+and loads the play-by-play, `colors` picks the teams' colors, and `plot`
+draws a game. A [marimo](https://marimo.io) notebook, `EDA.py`, uses it to
+explore the 2018 season and plot one game. The plan, including a page at
 bennetto.com/football, is in [`BACKLOG.md`](BACKLOG.md).
 
 ## Getting started
@@ -15,12 +17,16 @@ You need Python 3.12 or later.
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install marimo numpy pandas matplotlib
+.venv/bin/pip install -e '.[dev]'
 .venv/bin/marimo edit EDA.py
 ```
 
-The dependencies are not pinned yet (FBALL-2). The notebook was last run with
-marimo 0.25.1, numpy 2.5.4, pandas 3.0.6 and matplotlib 3.11.2.
+The dependencies are in `pyproject.toml`, with lower bounds only; the `dev`
+extra adds marimo. The package is installed editable, and the notebook
+re-runs the cells that use it when one of its modules is saved
+(`auto_reload` in `pyproject.toml`), which takes effect when marimo starts.
+It was last run with marimo 0.25.1, numpy 2.5.4, pandas 3.0.6 and
+matplotlib 3.11.2.
 
 The data is not in the repo. On a fresh clone, run the download cell near the
 top of the notebook by hand (it does not run automatically). It saves a

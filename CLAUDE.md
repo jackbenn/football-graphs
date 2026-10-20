@@ -9,6 +9,9 @@ How to set up and run the notebook is in `README.md`; the plan is in
   cells through `marimo._code_mode`. Never edit `EDA.py` directly while the
   notebook is open: the kernel rewrites it on save. If no notebook is open,
   ask Jack to start one rather than starting it yourself.
+- **The package in `src/football_graphs/` is ordinary files:** edit them
+  directly. The notebook reloads a module when it is saved and re-runs the
+  cells that use it.
 - **Read a cell's code from the kernel just before editing it.** Jack may
   have changed it in the browser since you last looked.
 - **Read the diff of `EDA.py` before committing it.** Stray edits from the
