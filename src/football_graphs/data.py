@@ -7,24 +7,36 @@ import pandas as pd
 
 BASE_URL = 'https://github.com/nflverse/nflverse-data/releases/download'
 
+# the play-by-play's text columns, among those the package reads; read in
+# chunks, a column whose first chunks are empty is otherwise taken for numbers
+TEXT_COLUMNS = {'game_id', 'season_type', 'game_date', 'home_team', 'away_team', 'posteam',
+                'defteam', 'play_type', 'td_team', 'field_goal_result', 'extra_point_result',
+                'two_point_conv_result'}
 
-def download(year, data_dir='data'):
+
+def download(year, data_dir='data', refresh=False):
     """Download one season of play-by-play, and the table of teams, into data_dir.
-    Delete a file to fetch a fresh copy."""
+    Delete a file, or pass refresh, to fetch a fresh copy."""
     Path(data_dir).mkdir(exist_ok=True)
     for url in [f'{BASE_URL}/pbp/play_by_play_{year}.csv.gz',
                 f'{BASE_URL}/teams/teams_colors_logos.csv']:
         path = Path(data_dir) / url.rsplit('/', 1)[1]
-        if path.exists():
+        if path.exists() and not refresh:
             print(f'{path} already exists')
         else:
             urllib.request.urlretrieve(url, path)
             print(f'downloaded {path}')
 
 
-def load_season(year, data_dir='data'):
-    """One season's play-by-play"""
-    return pd.read_csv(Path(data_dir) / f'play_by_play_{year}.csv.gz', low_memory=False)
+def load_season(year, data_dir='data', columns=None):
+    """One season's play-by-play: every column, or only the columns given. Reading
+    every column peaks near 500 MB; the few that game_data needs, read in chunks
+    as low_memory does, peak near 130 MB"""
+    path = Path(data_dir) / f'play_by_play_{year}.csv.gz'
+    if columns is None:
+        return pd.read_csv(path, low_memory=False)
+    return pd.read_csv(path, usecols=columns,
+                       dtype={column: 'str' for column in columns if column in TEXT_COLUMNS})
 
 
 def load_teams(data_dir='data'):

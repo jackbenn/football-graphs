@@ -50,6 +50,24 @@ The tests in `tests/test_game.py` build small games by hand for the scoring
 edge cases and need no data. The rest use the downloaded 2018 season and
 teams table, and are skipped without them.
 
+## Building the game files
+
+```bash
+.venv/bin/python -m football_graphs.build 2018    # or no season, for the current one
+```
+
+writes `games/2018/`: a gzipped JSON file for each game, named by its
+nflverse `game_id`, and `index.json.gz` listing the games and teams. It
+downloads the season first if it isn't in `data/` (`--refresh` to fetch it
+again), and exits with an error if any game's final score comes out wrong.
+
+On GitHub, the `build games` workflow runs this every day from September to
+February, after nflverse's own refresh, and uploads the season as
+`SEASON.tar` to the release named `games`. Run it by hand from the Actions
+tab for any other season. GitHub pauses scheduled workflows after 60 days
+without activity in the repository, so it may need re-enabling each
+September.
+
 ## Data
 
 Play-by-play and team colors come from

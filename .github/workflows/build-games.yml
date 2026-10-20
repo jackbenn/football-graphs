@@ -1,0 +1,43 @@
+# Build a season's game files and upload them, as SEASON.tar, to the release
+# named "games", where the host's cron job fetches them.
+name: build games
+
+on:
+  schedule:
+    # daily from September to February, after nflverse's 09:03 UTC refresh
+    - cron: '0 10 * 1,2,9-12 *'
+  workflow_dispatch:
+    inputs:
+      season:
+        description: 'Season, by the year it starts; blank for the current one'
+        required: false
+
+permissions:
+  contents: write    # to create the release and upload to it
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install .
+      - name: Build
+        env:
+          SEASON: ${{ inputs.season }}
+        run: |
+          season=${SEASON:-$(python -c 'from football_graphs.build import current_season; print(current_season())')}
+          python -m football_graphs.build "$season" --out games
+          echo "SEASON=$season" >> "$GITHUB_ENV"
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tar -cf "$SEASON.tar" -C games "$SEASON"
+          gh release view games > /dev/null 2>&1 || gh release create games --title 'Game files' \
+            --notes 'One tarball per season of gzipped JSON, one file per game plus an index, built from nflverse play-by-play (https://github.com/nflverse/nflverse-data), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), changed by football_graphs.'
+          gh release upload games "$SEASON.tar" --clobber

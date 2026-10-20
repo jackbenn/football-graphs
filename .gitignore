@@ -110,5 +110,8 @@ venv.bak/
 # Downloaded data; the notebook fetches it
 data/
 
+# Built game files; python -m football_graphs.build writes them
+games/
+
 # marimo session cache, which holds cell outputs
 __marimo__/

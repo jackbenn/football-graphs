@@ -4,6 +4,13 @@ import pandas as pd
 
 from .colors import pick_colors
 
+# the play-by-play columns game_data reads, before add_time_column and
+# add_yards_column add theirs
+COLUMNS = ['home_team', 'away_team', 'game_date', 'qtr', 'quarter_seconds_remaining',
+           'play_type', 'posteam', 'defteam', 'yardline_100', 'down', 'touchdown', 'td_team',
+           'field_goal_result', 'extra_point_result', 'two_point_conv_result', 'safety',
+           'posteam_score', 'posteam_score_post', 'defensive_two_point_conv']
+
 
 def game_data(df, teams):
     """What a plot of the game shows, as plain data that can be saved as JSON:
