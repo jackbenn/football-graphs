@@ -9,7 +9,7 @@ single game.
 
 ## [FBALL-12] Download the data and build the game files on a schedule
 
-- **Status:** active
+- **Status:** done
 - **Priority:** P3
 - **Size:** session
 - **Depends on:** FBALL-9, FBALL-11
@@ -58,7 +58,7 @@ build should be one command that FBALL-18 can run for any season.
   listing them, reading only the columns it uses
 - [x] The build fails if any game's final score doesn't match `home_score`
   and `away_score`, so a new quirk stops the publish
-- [ ] A workflow runs it daily from September to February after nflverse's
+- [x] A workflow runs it daily from September to February after nflverse's
   09:03 UTC refresh, and by hand for any season, and uploads `SEASON.tar`
   to a release named `games`
 - [x] A test builds 2018 and checks the index against the files
@@ -120,9 +120,9 @@ accept gzip).
 
 ### Acceptance criteria
 - [x] The build's index labels each game's week 1–18, WC, DIV, CONF or SB
-- [ ] A page draws a game from its JSON with D3, matching `draw_game`, and
+- [x] A page draws a game from its JSON with D3, matching `draw_game`, and
   credits nflverse with a link to CC BY 4.0
-- [ ] The page has the filters and paged list described above, and always
+- [x] The page has the filters and paged list described above, and always
   shows a game: `?game=<game_id>`, or else the most recent
 - [ ] bennetto.com/football serves the page and the game files, gzipped,
   with the host fetching each season's tarball daily, and a row in
