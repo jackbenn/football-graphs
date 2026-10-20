@@ -46,6 +46,27 @@ Open questions to settle when refining it:
   committing `EDA.py`. The skill needs `jq`, and installing it (a
   third-party skill) needed Jack's approval.
 
+## [FBALL-2] Declare the dependencies
+
+- **Status:** done
+- **Priority:** P2
+- **Size:** quick
+- **Depends on:** none
+- **Tags:** config
+- **Commits:** e2f020f
+
+No `requirements.txt` or equivalent. The notebook imports `numpy`, `pandas`
+and `matplotlib`, and was last run on Python 3.6.7. Found by `project-init`
+(META-1), 2026-10-19.
+
+Done as part of FBALL-9: lower bounds only for now, exact pins left until the
+Docker image (FBALL-13) needs them.
+
+### Acceptance criteria
+- [x] `pyproject.toml` declares the runtime dependencies with lower bounds,
+  and marimo in a `dev` extra
+- [x] The README's install steps use it
+
 ## [FBALL-3] Add a `## Getting started` section to the README
 
 - **Status:** done
@@ -109,3 +130,185 @@ and diffs the notebook. Found by `project-init` (META-1), 2026-10-19.
 - 2026-10-19: Solved by moving to marimo (FBALL-1). `EDA.py` is plain Python
   with no outputs; marimo keeps outputs in `__marimo__/session/`, now ignored.
   The old `EDA.ipynb`, outputs and all, is still in the repo.
+
+## [FBALL-9] Move the data and plotting code out of the notebook
+
+- **Status:** done
+- **Priority:** P2
+- **Size:** session
+- **Depends on:** FBALL-2
+- **Tags:** refactor
+- **Related:** FBALL-10, FBALL-11
+- **Commits:** e2f020f, 36a4c68
+
+Move the download, loading, `add_time_column`, `add_yards_column`,
+`pick_colors` and `plot_game` into a Python package that `EDA.py` imports, so
+the code can be tested (FBALL-10) and run by the website.
+
+Worth splitting `plot_game` while doing it: one function that turns a game's
+rows into data (segments with their style, markers, score labels, team colors,
+quarter boundaries) and one that draws that data with matplotlib. The scoring
+logic is the part most worth testing, and if the web page draws in the
+browser (FBALL-11), it can draw from that same data as JSON.
+
+Moving code that the notebook imports changes the pairing workflow: marimo
+won't pick up edits to an imported module without a reload, so check how
+that feels before moving everything.
+
+Decided 2026-10-19: a `src/football_graphs/` package (`data`, `colors`,
+`game`, `plot`) installed editable; marimo's `auto_reload = "autorun"`; the data
+directory a parameter defaulting to `data`; the exploration cells stay in
+`EDA.py`; the split of `plot_game` done in this item, as a separate commit
+after the plain move.
+
+### Acceptance criteria
+- [x] `EDA.py` imports the download, loading, column, color and plotting code
+  from the package, and the download cell still defines only `_` names
+- [x] Both plots of 2018090902 are pixel-identical before and after the move,
+  and after the split
+- [x] `plot_game` is split into a function that returns the game's data and
+  one that draws it
+- [x] Every 2018 game still ends on its real final score
+
+## [FBALL-10] Tests
+
+- **Status:** done
+- **Priority:** P2
+- **Size:** session
+- **Depends on:** FBALL-9
+- **Tags:** test
+- **Commits:** 5f82c71
+
+Start with the checks already run by hand while building the plot: every 2018
+game's final score matches `home_score` and `away_score`, no two score labels
+on the same side are within two plays of each other, and `pick_colors` finds a
+distinct pair for every matchup without falling back to grey. Add small
+hand-built cases for the scoring edge cases: a defensive touchdown, a
+punt-return safety, a defensive two-point return, a game whose first play
+isn't a kickoff. The season-wide checks need the downloaded data, so they may
+want marking as slow.
+
+Found while starting it, 2026-10-19: the closest same-side labels in 2018
+are two plays apart (a field goal, the kickoff, then a defensive touchdown),
+so the label check fails below two. The one game whose first play isn't a
+`kickoff` (2018102500) opens with a kickoff wiped out by a penalty, a
+`no_play` whose `posteam` is the receiving team.
+
+### Acceptance criteria
+- [x] `pytest` runs the tests, and pytest is in the `dev` extra
+- [x] Season-wide: every 2018 game ends on `home_score` and `away_score`,
+  and no two labels on the same side are under two plays apart; marked slow
+  and skipped without the downloaded data
+- [x] `pick_colors` finds a pair without grey for every ordered pair of teams
+  in the teams table
+- [x] Hand-built games, needing no downloaded data, for a defensive
+  touchdown, a punt-return safety, a defensive two-point return and a game
+  whose first play isn't a kickoff
+
+## [FBALL-11] Decide how the game page is built and where it runs
+
+- **Status:** done
+- **Priority:** P2
+- **Size:** session
+- **Depends on:** none
+- **Tags:** web
+- **Related:** FBALL-9, FBALL-12, FBALL-13
+
+The aim is a page at bennetto.com/football where a visitor picks a game and
+sees its graph, with details of a play on click or hover. This repo becomes a
+submodule of `bennetto-infra`, like `gengo` and `taking_the_story`, rather
+than part of `website`. The site is one Docker Compose stack on an EC2 host
+(`bennetto-infra/DEPLOY.md`), with each app its own container behind nginx.
+
+Questions to settle:
+- Where the drawing happens. Matplotlib images from a server are closest to
+  the notebook but make hover details awkward; drawing in the browser (D3,
+  Plotly, Vega-Lite) from JSON makes them easy but means a second renderer.
+- Whether the container needs an app server at all. A season is a few
+  hundred games, so the per-game JSON could be precomputed by the scheduled
+  download (FBALL-12) and served as static files from the container, which
+  also makes caching (FBALL-16) moot.
+- How a visitor picks a game: season, week, team.
+
+The output is revised items FBALL-12 to FBALL-16, not code.
+
+### Decision
+2026-10-19, for a t3.micro with little else on it, and a page that should
+show a game within a few seconds:
+- **Drawing in the browser, with D3**, from the JSON of `game_data`. Measured
+  on the laptop (M1): a game's JSON is 32 KB, 4.4 KB gzipped, and drawing it
+  in the browser is well under 100 ms whatever the server's CPU credits.
+  Matplotlib on the server took 430 ms per game for one panel on the laptop,
+  likely 2–3 s with the FBALL-6/7 panels on a t3.micro with credits and far
+  more without, and makes hover awkward. D3 over Vega-Lite or Plotly because
+  `draw_game` is imperative, mark by mark, so it ports nearly line for line,
+  and the bundle is about 90 KB gzipped against Plotly's 1 MB. The cost is a
+  second renderer beside the notebook's matplotlib one.
+- **Everything precomputed, past seasons included**, as static files served
+  by nginx, with no app server. Computing past seasons on demand would need
+  an always-on pandas process on a 1 GB host and the raw CSVs on disk (18 MB
+  a season, more than the finished JSON), and a season's first request
+  would take several seconds. Precomputing a season takes about 10 s on the
+  laptop; every season since 1999 is a few minutes, and about 100 MB stored
+  gzipped. Caching (FBALL-16) is dropped.
+- Loading a full season peaks at 512 MB; only the ~25 columns used, 33 MB.
+  Anything that loads a season on the host must use only those columns.
+
+Still open, for FBALL-13: how a visitor picks a game (season, week, team).
+
+## [FBALL-15] Display options on the game page
+
+- **Status:** dropped
+- **Reason:** No display by clock time is wanted, and there are no other options in sight; the FBALL-6/7 panels are just part of the graph.
+- **Priority:** P4
+- **Size:** unknown
+- **Depends on:** FBALL-13
+- **Tags:** web
+- **Related:** FBALL-6, FBALL-7
+
+Options for how the graph is shown. The play number or clock time on the x
+axis is the one that exists now; the score and clock-time panels (FBALL-6,
+FBALL-7) could be others.
+
+Every point in `game_data` has both x values, so switching the x axis needs
+no new files and can happen entirely in the browser.
+
+## [FBALL-16] Cache rendered games
+
+- **Status:** dropped
+- **Reason:** FBALL-11 settled on precomputed static files: nothing is rendered on demand, so there is nothing to cache.
+- **Priority:** P5
+- **Size:** unknown
+- **Depends on:** FBALL-13
+- **Tags:** web, performance
+
+Cache games if rendering them on demand starts getting expensive. Very long
+term, and may be unnecessary if FBALL-11 settles on precomputed files.
+
+## [FBALL-17] Check the nflverse data license
+
+- **Status:** done
+- **Priority:** P2
+- **Size:** quick
+- **Depends on:** none
+- **Tags:** data
+- **Related:** FBALL-11, FBALL-13
+
+Find the license of the nflverse play-by-play and teams data, and whatever
+the NFL's own terms say about the play-by-play underneath it. Only reading
+it in a notebook needs nothing, but serving it on bennetto.com/football
+(FBALL-13), and showing play descriptions (FBALL-14), may need attribution or
+may not be allowed. Record the answer in the README's Data section, and in
+new items if it changes the plan.
+
+### Answer
+2026-10-19, recorded in the README's Data section: nflverse's `pbp` and
+`teams` data are CC BY 4.0 (the `LICENSE.md` of nflverse-data and of
+nflverse-pbp; nflreadpy says the same of all nflverse data except FTN's
+charting data, which is CC BY-SA and not used here). Serving it, or files
+built from it, needs a credit to nflverse, a link to the license and a note
+that it was changed. The play-by-play underneath comes from the NFL's feeds,
+which nflverse can't license: game facts aren't copyrightable in the US, but
+the play descriptions are the NFL's wording. Not a lawyer's answer; it
+doesn't change the plan, but FBALL-13 gets the credit and FBALL-14 the open
+question about `desc`.

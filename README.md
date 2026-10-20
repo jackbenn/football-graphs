@@ -55,8 +55,21 @@ teams table, and are skipped without them.
 Play-by-play and team colors come from
 [nflverse](https://github.com/nflverse/nflverse-data) (the `pbp` and `teams`
 releases), which is refreshed daily during the season. The data is not
-covered by this repository's license, and its own license has not been
-checked yet (FBALL-17).
+covered by this repository's license.
+
+nflverse releases it under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+(the `LICENSE.md` of nflverse-data and of nflverse-pbp, which builds the
+play-by-play). Anything that shows it, or files built from it, must credit
+nflverse, link to the license, and say the data was changed. Checked
+2026-10-19.
+
+That license covers what nflverse adds. The play-by-play underneath is
+scraped from the NFL's own feeds, and nflreadr says that NFL data "belong to
+their respective owners, and are governed by their terms of use". Facts
+about a game, such as the ball's position, the down and the score, are not
+copyrightable in the US; the play descriptions (`desc`) are the NFL's own
+wording, which is less clear. The teams release also has logo URLs, and the
+logos are trademarks, so this project uses only the names and colors.
 
 The repo originally used CSVs from [nflsavant.com](http://nflsavant.com/),
 which now serves nflverse data in the same format.
