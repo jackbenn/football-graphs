@@ -38,6 +38,33 @@ svg.game .title {
   font-size: 16px;
 }
 
+svg.game .column {
+  fill: var(--hover);
+}
+
+svg.game .column.pinned {
+  fill: var(--shown);
+}
+
+/* the play details, in the gap above the game graph; two lines fit */
+svg.game .details {
+  box-sizing: border-box;
+  height: 100%;
+  padding: 2px 6px;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 15px;
+  border-left: 2px solid var(--line);
+}
+
+svg.game .details.pinned {
+  border-left-color: #1c5cab;
+}
+
+svg.game .details.hint {
+  color: var(--muted);
+}
+
 #message:empty {
   display: none;
 }

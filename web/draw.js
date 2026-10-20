@@ -3,14 +3,14 @@
 // and below it each play's down, in the offense's color, over a bar hanging down
 // for the clock time it took, colored by what stopped the clock.
 
-const WIDTH = 1250, HEIGHT = 612;
+const WIDTH = 1250, HEIGHT = 640;
 const MARGIN = {right: 34, left: 52};    // and web/style.css indents to MARGIN.left
-// the panels, top to bottom, in pixels, with the game graph's legend between the
-// first two and the downs between the last two
+// the panels, top to bottom, in pixels, with the play details and the game
+// graph's legend between the first two and the downs between the last two
 const SCORE = {top: 44, bottom: 134};
-const GAME = {top: 158, bottom: 486};
-const DOWNS = 500;
-const CLOCK = {top: 512, bottom: 592, most: 60};    // and the clock panel's bottom in seconds
+const GAME = {top: 182, bottom: 510};
+const DOWNS = 526;
+const CLOCK = {top: 540, bottom: 620, most: 60};    // and the clock panel's bottom in seconds
 
 // dash pattern for the play that starts at each point, as in plot.py's STYLES
 const SOLID = null, DOTTED = '1.5 2.5', DASHED = '6 3', DASHDOT = '8 3 1.5 3';
@@ -150,6 +150,61 @@ export function drawGame(svg, game) {
 
   drawScore(svg, game, x);
   drawClock(svg, game, x);
+  drawDetails(svg, game, x, x.range()[1] + right);
+}
+
+// each play's description, in a box left of the legend, for the play under the
+// mouse anywhere from the top of the score to the bottom of the clock bars; a
+// click pins it until the next click or Escape, and the arrow keys step a pinned
+// play back and forth. The play's column is shaded behind everything.
+function drawDetails(svg, game, x, legendLeft) {
+  const plays = game.plays;
+  const width = x(1) - x(0);
+  const column = svg.insert('rect', ':first-child').attr('class', 'column')
+    .attr('y', SCORE.top).attr('height', CLOCK.bottom - SCORE.top).attr('width', width)
+    .style('display', 'none');
+  const box = svg.append('foreignObject')
+    .attr('x', x.range()[0]).attr('y', SCORE.bottom + 6)
+    .attr('width', legendLeft - 24 - x.range()[0]).attr('height', GAME.top - SCORE.bottom - 10)
+    .append('xhtml:div').attr('class', 'details');
+  let pinned = null;    // the index in plays of the pinned play, if any
+
+  const show = (i, isPinned = false) => {
+    if (i === null) {
+      column.style('display', 'none');
+      box.classed('pinned', false).classed('hint', true).attr('title', null)
+        .text('Point at a play for its description; click to keep it.');
+      return;
+    }
+    column.style('display', null).classed('pinned', isPinned)
+      .attr('x', x(plays[i].play) - width / 2);
+    // the few too long for two lines are cut off, but whole in the tooltip
+    box.classed('pinned', isPinned).classed('hint', false)
+      .attr('title', plays[i].desc).text(plays[i].desc);
+  };
+  const under = event => {
+    const [px, py] = d3.pointer(event, svg.node());
+    if (py < SCORE.top || py > CLOCK.bottom || px < x.range()[0] || px > x.range()[1]) return null;
+    return d3.bisector(p => p.play).center(plays, x.invert(px));
+  };
+
+  svg.on('pointermove', event => { if (pinned === null) show(under(event)); })
+    .on('pointerleave', () => { if (pinned === null) show(null); })
+    .on('click', event => {
+      pinned = pinned === null ? under(event) : null;
+      pinned === null ? show(under(event)) : show(pinned, true);
+    });
+  // namespaced, so drawing the next game replaces these rather than adding to them
+  d3.select(window).on('keydown.details', event => {
+    if (pinned === null || event.target.closest?.('input, button, summary')) return;
+    if (event.key === 'Escape') pinned = null;
+    else if (event.key === 'ArrowLeft') pinned = Math.max(0, pinned - 1);
+    else if (event.key === 'ArrowRight') pinned = Math.min(plays.length - 1, pinned + 1);
+    else return;
+    event.preventDefault();
+    show(pinned, pinned !== null);
+  });
+  show(null);
 }
 
 // each team's score, a step after each play that scores, so that a touchdown and
