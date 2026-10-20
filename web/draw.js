@@ -2,7 +2,7 @@
 // src/football_graphs/plot.py, by play number, and below it a bar for each play
 // of the clock time it took, colored by what stopped the clock.
 
-const WIDTH = 1250, GAME_HEIGHT = 400, HEIGHT = 530;
+const WIDTH = 1250, GAME_HEIGHT = 400, HEIGHT = 500;
 const MARGIN = {top: 44, right: 12, bottom: 28, left: 34};
 const CLOCK = {top: 412, bottom: 492, most: 60};    // the clock panel, in pixels, and its top in seconds
 
@@ -13,21 +13,22 @@ const STYLES = {run: SOLID, qb_kneel: SOLID, pass: DOTTED, qb_spike: DOTTED,
                 no_play: DASHDOT};
 const LEGEND = [['run', SOLID], ['pass', DOTTED], ['kick', DASHED], ['no play (penalty)', DASHDOT]];
 
-// what stopped the clock after each play, in the order of the legend; game_data's
-// reasons, with the kicks and turnovers together as changes of possession, and the
-// two-minute warning with the end of the quarter
+// what stopped the clock after each play, in groups of like reasons with like
+// colors, as the legend shows them: game_data's reasons, with the kicks and
+// turnovers together as changes of possession, and the two-minute warning with
+// the end of the quarter
 const STOPS = [
-  {label: 'clock running', color: '#a3a29c', stops: ['running']},
-  {label: 'incomplete pass', color: '#2a78d6', stops: ['incomplete']},
-  {label: 'out of bounds', color: '#eb6834', stops: ['out_of_bounds']},
-  {label: 'timeout', color: '#1baf7a', stops: ['timeout']},
-  {label: 'two-minute warning or end of quarter', color: '#eda100',
-   stops: ['two_minute_warning', 'quarter_end']},
-  {label: 'penalty', color: '#e87ba4', stops: ['penalty']},
-  {label: 'score', color: '#008300', stops: ['score']},
-  {label: 'change of possession', color: '#6250d6', stops: ['kick', 'turnover']},
+  [{label: 'clock kept running', color: '#c2c0ba', stops: ['running']},
+   {label: 'change of possession', color: '#7a7871', stops: ['kick', 'turnover']}],
+  [{label: 'incomplete pass', color: '#1c5cab', stops: ['incomplete']},
+   {label: 'out of bounds', color: '#6da7ec', stops: ['out_of_bounds']}],
+  [{label: 'timeout', color: '#d95926', stops: ['timeout']},
+   {label: 'two-minute warning or end of quarter', color: '#e87ba4',
+    stops: ['two_minute_warning', 'quarter_end']},
+   {label: 'penalty', color: '#eda100', stops: ['penalty']}],
+  [{label: 'score', color: '#199e70', stops: ['score']}],
 ];
-const STOP = Object.fromEntries(STOPS.flatMap(group => group.stops.map(stop => [stop, group])));
+const STOP = Object.fromEntries(STOPS.flat().flatMap(item => item.stops.map(stop => [stop, item])));
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
                 'August', 'September', 'October', 'November', 'December'];
@@ -173,19 +174,13 @@ function drawClock(svg, game, x) {
     .attr('x', x.range()[0]).attr('y', CLOCK.top)
     .attr('width', x.range()[1] - x.range()[0]).attr('height', CLOCK.bottom - CLOCK.top)
     .attr('fill', 'none').attr('stroke', 'black').attr('stroke-width', 0.8);
+}
 
-  const legend = svg.append('g')
-    .attr('transform', `translate(${x.range()[0]},${CLOCK.bottom + 18})`)
-    .selectAll('g')
-    .data(STOPS)
-    .join('g');
-  let left = 0;
-  legend.each(function ({label, color}) {
-    const item = d3.select(this);
-    item.append('rect').attr('x', left).attr('y', -5).attr('width', 10).attr('height', 10)
-      .attr('fill', color);
-    const text = item.append('text').attr('class', 'legend').attr('x', left + 14)
-      .attr('dominant-baseline', 'central').text(label);
-    left += 14 + text.node().getComputedTextLength() + 18;
-  });
+// the legend for the clock bars, into an HTML element: what stopped the clock,
+// one item to a line, in its groups
+export function drawClockLegend(element) {
+  const group = d3.select(element).selectAll('ul').data(STOPS).join('ul');
+  const item = group.selectAll('li').data(items => items).join('li');
+  item.append('span').attr('class', 'swatch').style('background', item => item.color);
+  item.append('span').text(item => item.label);
 }

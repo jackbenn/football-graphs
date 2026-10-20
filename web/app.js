@@ -2,7 +2,7 @@
 // games, most recent first, with multi-select filters for year, week and team.
 // The game shown is the one in the URL (?game=<game_id>), or else the most recent.
 
-import {drawGame} from './draw.js';
+import {drawClockLegend, drawGame} from './draw.js';
 
 const PAGE_SIZE = 20;
 const WEEKS = [...Array.from({length: 18}, (_, i) => String(i + 1)), 'WC', 'DIV', 'CONF', 'SB'];
@@ -28,6 +28,7 @@ for (const index of await Promise.all(seasons.map(season => d3.json(`games/${sea
 }
 games.sort((a, b) => d3.descending(a.date, b.date) || d3.descending(a.game_id, b.game_id));
 
+drawClockLegend(document.getElementById('clock-legend'));
 buildFilters();
 showList();
 await showGame(new URLSearchParams(location.search).get('game') ?? games[0].game_id);

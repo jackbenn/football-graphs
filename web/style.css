@@ -33,7 +33,43 @@ svg.game .title {
   display: none;
 }
 
+.below {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1em 3em;
+}
+
+.clock-legend h2 {
+  margin: 1em 0 0.5em;
+  font-size: 1.05em;
+  font-weight: normal;
+  color: var(--muted);
+}
+
+.clock-legend ul {
+  margin: 0 0 0.6em;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9em;
+}
+
+.clock-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.1em 0;
+}
+
+.clock-legend .swatch {
+  flex: none;
+  width: 0.8em;
+  height: 0.8em;
+}
+
 .picker {
+  flex: 1;
+  min-width: 0;
   max-width: 40em;
 }
 
