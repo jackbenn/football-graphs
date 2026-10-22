@@ -1,6 +1,6 @@
 # Backlog — football-graphs
 
-Prefix: FBALL · Next ID: 19 · Schema: v1
+Prefix: FBALL · Next ID: 23 · Schema: v1
 
 A visualization of an American football game: one axis shows the position of
 the ball, the other time, either clock time or the play number. So far there
@@ -202,3 +202,122 @@ and again whenever the JSON format changes, by running its workflow by hand
 laptop. Older seasons may have data quirks `game_data` hasn't met, so run
 the season-wide tests (FBALL-10) on every season built, not only 2018, and
 fix what they find.
+
+## [FBALL-19] Rethink the clock panel for clock management
+
+- **Status:** question
+- **Priority:** unknown
+- **Size:** session
+- **Depends on:** none
+- **Tags:** web, exploration
+
+The clock panel (07176a9, e2b54c8) draws each play's duration as a bar
+colored by what stopped the clock. It doesn't work well. The colors are hard
+to see on short plays, which are the ones that matter most, and how a play
+ends isn't really a property of its duration, so the color and the length
+encode unrelated things. The goal of the panel is to help someone understand
+clock management: near the end of each half, and above all near the end of
+the game. Explore other designs, and turn the ones worth building into
+items.
+
+`duration` is the game clock from a play's snap to the next snap, so it
+includes the runoff between plays (`game.py`, `durations`). `stop` is what
+stopped the clock after the play, or `running`.
+
+Ideas to try:
+- **Time remaining, not duration.** Draw the clock left in the half (or the
+  game) after each play, as a step line falling to 0:00 at each half. A
+  steep drop is a play that used a lot of clock; a flat step is one where
+  the clock stopped.
+- **Mark the stops, not the plays.** Show only where the clock stopped, and
+  why, with small marks on that line (a T for a timeout, in the team's
+  color, and so on), rather than coloring every play. "Clock kept running"
+  is the default and needs no mark.
+- **Timeouts left.** Each team's timeouts remaining, as pips that empty as
+  they're used: the resource clock management spends.
+- **The two-minute warning and the end of each half** as reference lines.
+  There are no two-minute-warning rows in the data, so derive it from the
+  clock.
+- **More room for the end of each half.** Plays are evenly spaced, so the
+  last two minutes get the same room as any other stretch with as many
+  plays. Options: an inset or zoom on the last few minutes of each half; a
+  toggle to put the game clock on the x axis instead of the play number;
+  or widening the plays inside the last N minutes.
+- **Separate the play from the runoff.** Split each step into time during
+  the play and time between plays, if the data allows it. The time between
+  plays is what the hurry-up and the kneel-down control.
+- **Who wants the clock to run.** Shade by which team benefits (the leader
+  late in the game), so that a stop reads as good or bad for someone.
+- **Win probability.** nflverse has `wp`; a thin win-probability line would
+  show when the clock starts to matter. It's a new column and a new panel,
+  so a separate item if it's wanted at all.
+
+### Acceptance criteria
+- [ ] At least two of these designs tried on several close games with
+  late-game clock management, compared side by side
+- [ ] A decision on what replaces or changes the clock panel, written up as
+  new items
+
+## [FBALL-20] Make turnovers stand out
+
+- **Status:** idea
+- **Priority:** unknown
+- **Size:** session
+- **Depends on:** none
+- **Tags:** web, data
+
+Turnovers, particularly interceptions and fumbles, should be clearer on the
+graph. Today a turnover is only visible as the line changing color, and as
+the `turnover` stop in the clock panel.
+
+The build already reads `interception`, `fumble_lost` and
+`fourth_down_failed` (`game.py`) but collapses them into the one `stop`.
+Giving each play a `turnover` field (`interception`, `fumble`, `downs`)
+changes the JSON format, so every season in the release needs rebuilding
+(see CLAUDE.md).
+
+Possible ways to show them:
+- A distinct marker at the spot of the turnover (an X, or a filled
+  triangle pointing the new way), in the color of the team that gained
+  the ball.
+- A short label beside it: INT, FUM, or "downs".
+- A faint vertical band through all three panels at the play.
+- An entry for it in the legend.
+
+## [FBALL-21] Show the first-down line
+
+- **Status:** idea
+- **Priority:** unknown
+- **Size:** session
+- **Depends on:** none
+- **Tags:** web
+
+A faint horizontal line at the line to gain. It starts at each first down,
+10 yards from the ball toward the goal the offense is driving at, and runs
+to just past the last play before the next first down or change of
+possession.
+
+Each play already has `down`, `distance` and `y`, so this needs no change to
+the data. To decide: a penalty can change the distance (1st and 15). Either
+the line stays where the first down set it, or each play's own `distance`
+moves it, which makes it a step. Goal to go puts the line at the goal line.
+
+## [FBALL-22] An about page
+
+- **Status:** idea
+- **Priority:** unknown
+- **Size:** multi
+- **Depends on:** none
+- **Tags:** web, docs
+- **Related:** FBALL-17
+
+A page beside the game page, linked from it, that describes the graph and
+links to the GitHub repo. The description can come from `README.md`,
+without the details of the code. It credits nflverse, as the game page does.
+
+Both the about page and the README should show a chart of a good example
+game, with annotations that point out how to read it: a drive, a score, a
+kickoff, a penalty, the clock panel. The README needs it as an image (an SVG
+or PNG in the repo), so the annotated chart is probably made once and used
+in both. Choosing the game is part of the work: a close one, with a turnover
+and some late clock management, shows the most.
